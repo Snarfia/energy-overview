@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-02-17T16:49:34.947Z",
-  "durationMs": 24270,
+  "generatedAt": "2026-02-17T16:57:07.817Z",
+  "durationMs": 46332,
   "items": [
     {
       "id": "dayAheadPower24h",
@@ -9,7 +9,7 @@
       "unit": "EUR/MWh",
       "source": "ENTSO-E Transparency API (EPEX SPOT NL)",
       "sourceUrl": "https://web-api.tp.entsoe.eu/api",
-      "updatedAt": "2026-02-17T16:49:11.695Z",
+      "updatedAt": "2026-02-17T16:56:22.531Z",
       "detail": "Komende 24 uur per uur",
       "rows": [
         {
@@ -137,11 +137,11 @@
     {
       "id": "ttfGas",
       "label": "TTF Gas",
-      "value": 29.9696,
+      "value": 29.9857,
       "unit": "EUR/MWh",
       "source": "TradingEconomics",
       "sourceUrl": "https://tradingeconomics.com/commodity/eu-natural-gas",
-      "updatedAt": "2026-02-17T16:49:11.808Z"
+      "updatedAt": "2026-02-17T16:56:22.697Z"
     },
     {
       "id": "ets",
@@ -160,7 +160,7 @@
       "valueText": "Verhouding per bron",
       "source": "ENTSO-E Transparency API",
       "sourceUrl": "https://web-api.tp.entsoe.eu/api",
-      "updatedAt": "2026-02-17T16:49:12.691Z",
+      "updatedAt": "2026-02-17T16:56:45.804Z",
       "detail": "Bron tijdelijk niet bereikbaar | fout: No generation mix values | tijdelijke bronstoring, laatste geldige waarde getoond | fout: No generation mix values | tijdelijke bronstoring, laatste geldige waarde getoond | fout: No generation mix values",
       "rows": []
     },
@@ -236,11 +236,11 @@
     {
       "id": "nlCrossBorderFlows",
       "label": "Cross-Border Physical Flows NL (live, netto)",
-      "value": 5919.6404999999995,
+      "value": 5548.655239,
       "unit": "MW",
       "source": "ENTSO-E Transparency API",
       "sourceUrl": "https://web-api.tp.entsoe.eu/api",
-      "updatedAt": "2026-02-17T16:49:16.485Z",
+      "updatedAt": "2026-02-17T16:56:50.143Z",
       "detail": "Positief = netto import naar NL, negatief = netto export uit NL",
       "rows": [
         {
@@ -250,7 +250,7 @@
         },
         {
           "hour": "Duitsland",
-          "value": 1656.9,
+          "value": 1613.36933,
           "unit": "MW"
         },
         {
@@ -260,12 +260,12 @@
         },
         {
           "hour": "Denemarken",
-          "value": 623.07,
+          "value": 338.29,
           "unit": "MW"
         },
         {
           "hour": "Noorwegen",
-          "value": 649.09,
+          "value": 606.415409,
           "unit": "MW"
         }
       ]
@@ -277,7 +277,7 @@
       "unit": "%",
       "source": "NED API",
       "sourceUrl": "https://api.ned.nl/v1/utilizations",
-      "updatedAt": "2026-02-17T16:49:25.700Z",
+      "updatedAt": "2026-02-17T16:56:59.414Z",
       "detail": "Bron tijdelijk niet bereikbaar | fout: No NED storage rows"
     },
     {
@@ -298,7 +298,7 @@
       "unit": "Hz",
       "source": "mainsfrequency.com",
       "sourceUrl": "https://mainsfrequency.com/",
-      "updatedAt": "2026-02-17T16:49:27.360Z",
+      "updatedAt": "2026-02-17T16:57:00.730Z",
       "detail": "Doelwaarde rond 50 Hz"
     },
     {
@@ -308,19 +308,19 @@
       "unit": "GWh/d",
       "source": "NED API",
       "sourceUrl": "https://api.ned.nl/v1/utilizations",
-      "updatedAt": "2026-02-17T16:49:30.119Z",
+      "updatedAt": "2026-02-17T16:57:03.410Z",
       "detail": "Bron tijdelijk niet bereikbaar | fout: No NED rows for Huishoudens & kleinzakelijk",
       "rows": []
     },
     {
       "id": "tennetRegulation",
       "label": "TenneT Balance Delta (actueel, 12s)",
-      "value": -137,
+      "value": -181,
       "unit": "MW",
       "source": "TenneT API (Balance Delta High Res)",
       "sourceUrl": "https://api.tennet.eu/publications/v1/balance-delta-high-res/latest",
-      "updatedAt": "2026-02-17T16:47:24Z",
-      "detail": "In 162.5 MW | Out 25.5 MW"
+      "updatedAt": "2026-02-17T16:55:00Z",
+      "detail": "In 197.1 MW | Out 16.1 MW"
     },
     {
       "id": "tennetSettlement",
@@ -329,7 +329,7 @@
       "unit": "EUR/MWh",
       "source": "TenneT API (fallback via Balance Delta)",
       "sourceUrl": "https://api.tennet.eu/publications/v1/balance-delta-high-res/latest",
-      "updatedAt": "2026-02-17T16:47:24Z",
+      "updatedAt": "2026-02-17T16:55:00Z",
       "detail": "Fallback | Mid 62 | Up 109.7 | Down n/a"
     },
     {
@@ -339,7 +339,7 @@
       "unit": "EUR/kWh",
       "source": "Gaslicht",
       "sourceUrl": "https://www.gaslicht.com/stroom-vergelijken/resultaten?showonlyswitchable=False&contracttype=Vast&stroomhoogverbruik=1000&stroomlaagverbruik=1000",
-      "updatedAt": "2026-02-17T16:49:33.983Z",
+      "updatedAt": "2026-02-17T16:57:06.782Z",
       "detail": "Bron tijdelijk niet bereikbaar | fout: Could not parse Gaslicht cheapest price"
     },
     {
@@ -349,7 +349,7 @@
       "unit": "EUR/m3",
       "source": "Gaslicht",
       "sourceUrl": "https://www.gaslicht.com/gas-vergelijken/resultaten?showonlyswitchable=False&contracttype=Vast&gasverbruik=1000",
-      "updatedAt": "2026-02-17T16:49:34.946Z",
+      "updatedAt": "2026-02-17T16:57:07.816Z",
       "detail": "Bron tijdelijk niet bereikbaar | fout: Could not parse Gaslicht cheapest price"
     },
     {
@@ -359,7 +359,7 @@
       "unit": "jaar",
       "source": "Gaslicht",
       "sourceUrl": "https://www.gaslicht.com/energievergelijken/",
-      "updatedAt": "2026-02-17T16:49:10.678Z",
+      "updatedAt": "2026-02-17T16:56:21.485Z",
       "detail": "Deze scraper is nog niet omgezet naar JavaScript backend"
     },
     {
@@ -369,14 +369,14 @@
       "unit": "jaar",
       "source": "Gaslicht",
       "sourceUrl": "https://www.gaslicht.com/stroom-vergelijken/resultaten?showonlyswitchable=False&contracttype=Vast&stroomhoogverbruik=1000&stroomlaagverbruik=1000",
-      "updatedAt": "2026-02-17T16:49:10.678Z",
+      "updatedAt": "2026-02-17T16:56:21.485Z",
       "detail": "Deze scraper is nog niet omgezet naar JavaScript backend"
     }
   ],
   "errors": [
     {
-      "source": "getEntsoeGenerationMixShare",
-      "error": "No generation mix values"
+      "source": "getGenerationMixShare",
+      "error": "No NED generation mix values"
     },
     {
       "source": "getNlGasStorage",
