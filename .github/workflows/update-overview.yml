@@ -1,0 +1,35 @@
+name: Update overview.json
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Generate static overview
+        env:
+          ENTSOE_API_TOKEN: ${{ secrets.ENTSOE_API_TOKEN }}
+          NED_API_TOKEN: ${{ secrets.NED_API_TOKEN }}
+          TENNET_API_KEY: ${{ secrets.TENNET_API_KEY }}
+        run: npm run update:overview
+
+      - name: Commit changes
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "chore(data): update static/overview.json"
+          file_pattern: static/overview.json
