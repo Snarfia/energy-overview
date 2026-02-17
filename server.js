@@ -406,6 +406,98 @@ async function getEntsoeGenerationMixShare() {
   };
 }
 
+function nedValueToMw(rec) {
+  const unit = String(rec?.unit || rec?.unitofmeasure || rec?.uom || '').toLowerCase();
+  const raw = toNumber(rec?.capacity ?? rec?.value ?? rec?.volume ?? rec?.percentage);
+  if (raw === null) return null;
+  if (unit.includes('mw')) return raw;
+  if (unit.includes('kw')) return raw / 1000;
+  if (unit.includes('%')) return null;
+  return raw > 20000 ? raw / 1000 : raw;
+}
+
+async function getNedGenerationMixShare() {
+  const now = new Date();
+  const after = new Date(now.getTime() - 2 * 24 * 3600_000).toISOString().slice(0, 10);
+  const types = [
+    [1, 'Wind'],
+    [17, 'Wind'],
+    [2, 'Zon'],
+    [18, 'Gascentrales'],
+    [19, 'Kolencentrales'],
+    [20, 'Kernenergie'],
+    [21, 'Afval'],
+    [25, 'Biomassa'],
+  ];
+  const byLabel = new Map();
+  let sourceUrl = 'https://api.ned.nl/v1/utilizations';
+
+  for (const [type, label] of types) {
+    let chosen = null;
+    let localUrl = sourceUrl;
+    for (const att of [{ type, activity: 1 }, { type }, { type, activity: 2 }]) {
+      try {
+        const res = await fetchNedUtilizations({
+          point: 0,
+          granularity: 4,
+          granularitytimezone: 0,
+          'validfrom[after]': after,
+          itemsPerPage: 300,
+          ...att,
+        });
+        localUrl = res.url;
+        const parsed = res.rows
+          .map((r) => ({ dt: parseIsoUtc(r.validfrom || r.timestamp || r.date), mw: nedValueToMw(r) }))
+          .filter((x) => x.dt && x.mw !== null)
+          .sort((a, b) => a.dt - b.dt);
+        if (parsed.length) {
+          chosen = parsed[parsed.length - 1].mw;
+          break;
+        }
+      } catch {
+        // try next
+      }
+    }
+    if (chosen !== null) {
+      byLabel.set(label, (byLabel.get(label) || 0) + chosen);
+      sourceUrl = localUrl;
+    }
+  }
+
+  const entries = Array.from(byLabel.entries()).filter(([, v]) => Number.isFinite(v) && v > 0);
+  const total = entries.reduce((s, [, v]) => s + v, 0);
+  if (!entries.length || total <= 0) throw new Error('No NED generation mix values');
+
+  const order = ['Gascentrales', 'Kolencentrales', 'Afval', 'Zon', 'Wind', 'Biomassa', 'Kernenergie'];
+  const rows = order
+    .map((label) => {
+      const val = entries.find(([k]) => k === label)?.[1];
+      return val ? { hour: label, value: (val / total) * 100, unit: '%' } : null;
+    })
+    .filter(Boolean);
+
+  return {
+    id: 'nlGenerationMixShare',
+    label: 'Opwek Mix NL (actuele verhouding)',
+    value: null,
+    unit: '',
+    valueText: 'Verhouding per bron',
+    source: 'NED API (fallback)',
+    sourceUrl,
+    updatedAt: new Date().toISOString(),
+    detail: 'Relatieve verdeling per opwekbron (fallback via NED)',
+    rows,
+  };
+}
+
+async function getGenerationMixShare() {
+  try {
+    return await getEntsoeGenerationMixShare();
+  } catch {
+    return getNedGenerationMixShare();
+  }
+}
+
 async function getEntsoeElectricityOverview() {
   const now = new Date();
   now.setUTCMinutes(0, 0, 0);
@@ -929,7 +1021,7 @@ async function collectOverview() {
     [getDayAheadPower24h, { id: 'dayAheadPower24h', label: 'EPEX SPOT Day-Ahead NL (24h vooruit)', value: null, unit: 'EUR/MWh', source: 'ENTSO-E Transparency API (EPEX SPOT NL)', sourceUrl: ENTSOE_BASE, updatedAt: new Date().toISOString(), detail: 'Bron tijdelijk niet bereikbaar', rows: fallbackRows24 }],
     [getTTFGas, { id: 'ttfGas', label: 'TTF Gas', value: null, unit: 'EUR/MWh', source: 'TradingEconomics', sourceUrl: 'https://tradingeconomics.com/commodity/eu-natural-gas', updatedAt: new Date().toISOString(), detail: 'Bron tijdelijk niet bereikbaar' }],
     [getETSPrice, { id: 'ets', label: 'EU ETS (ICE EUA Futures)', value: null, unit: 'EUR/tCO2', source: 'Barchart', sourceUrl: 'https://www.barchart.com/futures/quotes/CKJ26', updatedAt: new Date().toISOString(), detail: 'Bron tijdelijk niet bereikbaar' }],
-    [getEntsoeGenerationMixShare, { id: 'nlGenerationMixShare', label: 'Opwek Mix NL (actuele verhouding)', value: null, unit: '', valueText: 'Verhouding per bron', source: 'ENTSO-E Transparency API', sourceUrl: ENTSOE_BASE, updatedAt: new Date().toISOString(), detail: 'Bron tijdelijk niet bereikbaar', rows: [] }],
+    [getGenerationMixShare, { id: 'nlGenerationMixShare', label: 'Opwek Mix NL (actuele verhouding)', value: null, unit: '', valueText: 'Verhouding per bron', source: 'ENTSO-E Transparency API', sourceUrl: ENTSOE_BASE, updatedAt: new Date().toISOString(), detail: 'Bron tijdelijk niet bereikbaar', rows: [] }],
     [getNlGasImport, { id: 'nlGasImport', label: 'Gas Cross-Border Flows NL (per land, netto)', value: null, unit: 'GWh/d', source: 'ENTSOG API', sourceUrl: ENTSOG_BASE, updatedAt: new Date().toISOString(), detail: 'Bron tijdelijk niet bereikbaar', rows: [{ hour: 'Belgie', value: null, unit: 'GWh/d' }, { hour: 'Duitsland', value: null, unit: 'GWh/d' }, { hour: 'Verenigd Koninkrijk', value: null, unit: 'GWh/d' }, { hour: 'Denemarken', value: null, unit: 'GWh/d' }, { hour: 'Noorwegen', value: null, unit: 'GWh/d' }, { hour: 'LNG (Gate+EET)', value: null, unit: 'GWh/d' }, { hour: 'Gasopslag (4 sites)', value: null, unit: 'GWh/d' }] }],
     [getNlGasProduction, { id: 'nlGasProduction', label: 'Gaswinning NL (laatste dag)', value: null, unit: 'GWh/d', source: 'ENTSOG API', sourceUrl: ENTSOG_BASE, updatedAt: new Date().toISOString(), detail: 'Bron tijdelijk niet bereikbaar' }],
     [getEntsoeCrossBorderFlows, { id: 'nlCrossBorderFlows', label: 'Cross-Border Physical Flows NL (live, netto)', value: null, unit: 'MW', source: 'ENTSO-E Transparency API', sourceUrl: ENTSOE_BASE, updatedAt: new Date().toISOString(), detail: 'Bron tijdelijk niet bereikbaar', rows: [{ hour: 'Belgie', value: null, unit: 'MW' }, { hour: 'Duitsland', value: null, unit: 'MW' }, { hour: 'Verenigd Koninkrijk', value: null, unit: 'MW' }, { hour: 'Denemarken', value: null, unit: 'MW' }, { hour: 'Noorwegen', value: null, unit: 'MW' }] }],
