@@ -747,6 +747,20 @@ function entsogGwhDay(value, unit) {
   return v / 1_000_000;
 }
 
+function pickLatestCompleteGasDayTs(rows) {
+  const tsList = rows.map((r) => String(r.periodFrom || '')).filter(Boolean).sort();
+  if (!tsList.length) return null;
+  const now = new Date();
+  const todayUtc = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  const past = tsList.filter((ts) => {
+    const d = parseIsoUtc(ts);
+    if (!d) return false;
+    const dayUtc = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+    return dayUtc < todayUtc;
+  });
+  return (past.length ? past[past.length - 1] : tsList[tsList.length - 1]);
+}
+
 async function getEntsogOperational(indicator, daysBack = 4, limit = 6000) {
   const to = new Date();
   const from = new Date(to.getTime() - daysBack * 24 * 3600_000);
@@ -763,7 +777,7 @@ async function getNlGasProduction() {
   const { rows, sourceUrl } = await getEntsogOperational('Allocation', 5, 5000);
   const prod = rows.filter((r) => String(r.directionKey || '').toLowerCase() === 'entry' && String(r.pointLabel || '').toLowerCase().includes('production'));
   if (!prod.length) throw new Error('No ENTSOG production rows');
-  const latestTs = prod.map((r) => String(r.periodFrom || '')).sort().at(-1);
+  const latestTs = pickLatestCompleteGasDayTs(prod) || prod.map((r) => String(r.periodFrom || '')).sort().at(-1);
   const dayRows = prod.filter((r) => String(r.periodFrom || '') === latestTs);
   const total = dayRows.reduce((s, r) => s + (entsogGwhDay(r.value, r.unit) || 0), 0);
   return {
@@ -788,7 +802,7 @@ async function getNlGasImport() {
   const meta = new Map();
   for (const r of opRows) meta.set(String(r.pointKey || ''), r);
 
-  const latestTs = flowRows.map((r) => String(r.periodFrom || '')).filter(Boolean).sort().at(-1);
+  const latestTs = pickLatestCompleteGasDayTs(flowRows) || flowRows.map((r) => String(r.periodFrom || '')).filter(Boolean).sort().at(-1);
   const rowsAtTs = flowRows.filter((r) => String(r.periodFrom || '') === latestTs);
 
   const countryMap = new Map();
@@ -884,7 +898,30 @@ async function getNlGasStorage() {
       lastErr = err;
     }
   }
-  if (!Array.isArray(rows) || !rows.length) throw new Error('No NED storage rows');
+  if (!Array.isArray(rows) || !rows.length) {
+    // Fallback when NED endpoint shape/filters change: keep storage card meaningful.
+    const imp = await getNlGasImport();
+    const storageRow = (imp.rows || []).find((r) => String(r.hour || '').toLowerCase().includes('gasopslag'));
+    const flow = toNumber(storageRow?.value);
+    let status = 'Trend onbekend';
+    if (flow !== null) {
+      if (Math.abs(flow) < 0.05) status = 'In balans';
+      else if (flow > 0) status = 'Leegt (uit opslag naar net)';
+      else status = 'Vult (naar opslag)';
+    }
+    return {
+      id: 'nlGasStorage',
+      label: 'NL Gasopslag (actueel)',
+      value: null,
+      unit: '%',
+      valueText: status,
+      source: 'ENTSOG API (fallback)',
+      sourceUrl: imp.sourceUrl || 'https://transparency.entsog.eu/api/v1/operationaldatas',
+      updatedAt: imp.updatedAt || new Date().toISOString(),
+      detail: 'NED tijdelijk niet beschikbaar; opslagstatus op basis van ENTSOG dagstroom',
+      rows: [{ hour: 'Gasopslag nettoflow', value: flow, unit: 'GWh/d' }],
+    };
+  }
   const parsed = rows
     .map((r) => ({ dt: parseIsoUtc(r.validfrom || r.timestamp || r.date), pct: toNumber(r.percentage ?? r.value ?? r.capacity), rec: r }))
     .filter((x) => x.dt && x.pct !== null)
@@ -967,6 +1004,42 @@ async function getNlGasConsumptionBreakdown() {
   };
 }
 
+async function getNlGasConsumptionBreakdownFallbackEntsog() {
+  const { rows, sourceUrl } = await getEntsogOperational('Allocation', 6, 6000);
+  const latestTs = pickLatestCompleteGasDayTs(rows);
+  const dayRows = rows.filter((r) => String(r.periodFrom || '') === latestTs && String(r.directionKey || '').toLowerCase() === 'exit');
+  if (!dayRows.length) throw new Error('No ENTSOG exit rows for fallback consumption');
+
+  let hh = 0;
+  let ind = 0;
+  let power = 0;
+  for (const r of dayRows) {
+    const lbl = String(r.pointLabel || '').toLowerCase();
+    const v = entsogGwhDay(r.value, r.unit) || 0;
+    if (lbl.includes('local distribution') || lbl.includes('dso') || lbl.includes('ldc')) hh += v;
+    else if (lbl.includes('power') || lbl.includes('electric') || lbl.includes('centrale')) power += v;
+    else if (lbl.includes('industry') || lbl.includes('industrial') || lbl.includes('consumer')) ind += v;
+    else ind += v;
+  }
+  const total = hh + ind + power;
+  if (!(total > 0)) throw new Error('ENTSOG fallback consumption total is empty');
+  return {
+    id: 'nlGasConsumptionBreakdown',
+    label: 'Gasconsumptie NL (laatste volledige dag)',
+    value: total,
+    unit: 'GWh/d',
+    source: 'ENTSOG API (fallback)',
+    sourceUrl,
+    updatedAt: parseIsoUtc(latestTs)?.toISOString() || new Date().toISOString(),
+    detail: 'NED tijdelijk niet beschikbaar; onderverdeling op ENTSOG exit-categorieen',
+    rows: [
+      { hour: 'Huishoudens & kleinzakelijk', value: (hh / total) * 100, unit: '%' },
+      { hour: 'Industrie', value: (ind / total) * 100, unit: '%' },
+      { hour: 'Gascentrales', value: (power / total) * 100, unit: '%' },
+    ],
+  };
+}
+
 async function getGaslichtCheapest(kind) {
   const isGas = kind === 'gas';
   const sourceUrl = isGas
@@ -979,17 +1052,33 @@ async function getGaslichtCheapest(kind) {
     ? [
         /([0-9]+[.,][0-9]{2,4})\s*(?:€|EUR)?\s*\/\s*(?:m3|m³)/i,
         /(?:m3|m³)[^0-9]{0,16}([0-9]+[.,][0-9]{2,4})/i,
+        /"(?:price|priceInclTax|priceExclTax|tariff|rate)"\s*:\s*"?([0-9]+(?:[.,][0-9]{2,5})?)"?/ig,
       ]
     : [
         /([0-9]+[.,][0-9]{3,5})\s*(?:€|EUR)?\s*\/\s*kwh/i,
         /kwh[^0-9]{0,16}([0-9]+[.,][0-9]{3,5})/i,
+        /"(?:price|priceInclTax|priceExclTax|tariff|rate)"\s*:\s*"?([0-9]+(?:[.,][0-9]{3,6})?)"?/ig,
       ];
   let value = null;
   for (const re of patterns) {
-    const m = html.match(re);
-    if (m) {
-      value = toNumber(m[1]);
-      if (value !== null) break;
+    if (re.flags && re.flags.includes('g')) {
+      const vals = [];
+      let m;
+      while ((m = re.exec(html))) {
+        const n = toNumber(m[1]);
+        if (n !== null) vals.push(n);
+      }
+      const plausible = vals.find((n) => (isGas ? (n >= 0.2 && n <= 5) : (n >= 0.03 && n <= 2)));
+      if (plausible !== undefined) {
+        value = plausible;
+        break;
+      }
+    } else {
+      const m = html.match(re);
+      if (m) {
+        value = toNumber(m[1]);
+        if (value !== null) break;
+      }
     }
   }
   if (value === null) throw new Error('Could not parse Gaslicht cheapest price');
@@ -1028,7 +1117,13 @@ async function collectOverview() {
     [getNlGasStorage, { id: 'nlGasStorage', label: 'NL Gasopslag (actueel)', value: null, unit: '%', source: 'NED API', sourceUrl: 'https://api.ned.nl/v1/utilizations', updatedAt: new Date().toISOString(), detail: 'Bron tijdelijk niet bereikbaar' }],
     [getEntsoeElectricityOverview, { id: 'nlElectricityOverview', label: 'Elektriciteit NL (actuele load)', value: null, unit: 'MW', source: 'ENTSO-E Transparency API', sourceUrl: ENTSOE_BASE, updatedAt: new Date().toISOString(), detail: 'Bron tijdelijk niet bereikbaar', rows: [] }],
     [getGridFrequency, { id: 'nlGridFrequency', label: 'Netfrequentie NL (actueel)', value: null, unit: 'Hz', source: 'mainsfrequency.com', sourceUrl: 'https://mainsfrequency.com', updatedAt: new Date().toISOString(), detail: 'Bron tijdelijk niet bereikbaar' }],
-    [getNlGasConsumptionBreakdown, { id: 'nlGasConsumptionBreakdown', label: 'Gasconsumptie NL (laatste volledige dag)', value: null, unit: 'GWh/d', source: 'NED API', sourceUrl: 'https://api.ned.nl/v1/utilizations', updatedAt: new Date().toISOString(), detail: 'Bron tijdelijk niet bereikbaar', rows: [] }],
+    [async () => {
+      try {
+        return await getNlGasConsumptionBreakdown();
+      } catch {
+        return await getNlGasConsumptionBreakdownFallbackEntsog();
+      }
+    }, { id: 'nlGasConsumptionBreakdown', label: 'Gasconsumptie NL (laatste volledige dag)', value: null, unit: 'GWh/d', source: 'NED API', sourceUrl: 'https://api.ned.nl/v1/utilizations', updatedAt: new Date().toISOString(), detail: 'Bron tijdelijk niet bereikbaar', rows: [] }],
     [getTennetRegulation, { id: 'tennetRegulation', label: 'TenneT Balance Delta (actueel, 12s)', value: null, unit: 'MW', source: 'TenneT API (Balance Delta High Res)', sourceUrl: 'https://api.tennet.eu/publications/v1/balance-delta-high-res/latest', updatedAt: new Date().toISOString(), detail: 'Bron tijdelijk niet bereikbaar' }],
     [getTennetSettlement, { id: 'tennetSettlement', label: 'TenneT Settlement Price (actueel)', value: null, unit: 'EUR/MWh', source: 'TenneT API (Settlement Prices)', sourceUrl: 'https://api.tennet.eu/publications/v1/settlement-prices', updatedAt: new Date().toISOString(), detail: 'Bron tijdelijk niet bereikbaar' }],
     [() => getGaslichtCheapest('power'), { id: 'gaslichtElectricity', label: 'Cheapest Electricity Provider (Gaslicht)', value: null, unit: 'EUR/kWh', source: 'Gaslicht', sourceUrl: 'https://www.gaslicht.com/stroom-vergelijken/resultaten?showonlyswitchable=False&contracttype=Vast&stroomhoogverbruik=1000&stroomlaagverbruik=1000', updatedAt: new Date().toISOString(), detail: 'Bron tijdelijk niet bereikbaar' }],
