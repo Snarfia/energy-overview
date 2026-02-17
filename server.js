@@ -74,6 +74,18 @@ async function fetchJson(url, extraHeaders = {}, timeoutMs = 15000) {
   return JSON.parse(txt);
 }
 
+async function fetchNedUtilizations(params) {
+  const sourceUrl = 'https://api.ned.nl/v1/utilizations';
+  const url = `${sourceUrl}?${query(params)}`;
+  const payload = await fetchJson(url, {
+    'X-AUTH-TOKEN': NED_TOKEN,
+    authorization: `Bearer ${NED_TOKEN}`,
+    accept: 'application/ld+json, application/json',
+  });
+  const rows = payload?.['hydra:member'] || payload?.member || payload?.items || payload?.data || payload?.results || [];
+  return { rows: Array.isArray(rows) ? rows : [], url };
+}
+
 function xmlTagValue(block, tagName) {
   const safe = tagName.replace('.', '\\.');
   const re = new RegExp(`<[^>]*${safe}[^>]*>([\\s\\S]*?)<\\/[^>]*${safe}>`, 'i');
@@ -318,27 +330,45 @@ async function getEntsoeGenerationMixShare() {
   const start = new Date(now.getTime() - 24 * 3600_000);
   const end = new Date(now.getTime() + 3600_000);
   const fmt = (d) => `${d.getUTCFullYear()}${String(d.getUTCMonth() + 1).padStart(2, '0')}${String(d.getUTCDate()).padStart(2, '0')}${String(d.getUTCHours()).padStart(2, '0')}${String(d.getUTCMinutes()).padStart(2, '0')}`;
-  const { xml, url } = await entsoeFetchXml({
-    securityToken: ENTSOE_TOKEN,
-    documentType: 'A75',
-    processType: 'A16',
-    in_Domain: '10YNL----------L',
-    periodStart: fmt(start),
-    periodEnd: fmt(end),
-  });
+  const attempts = [
+    { documentType: 'A75', processType: 'A16', in_Domain: '10YNL----------L' },
+    { documentType: 'A75', processType: 'A16', In_Domain: '10YNL----------L' },
+    { documentType: 'A75', in_Domain: '10YNL----------L' },
+    { documentType: 'A75', biddingZone_Domain: '10YNL----------L' },
+    { documentType: 'A75', BiddingZone_Domain: '10YNL----------L' },
+  ];
 
-  const series = xmlBlocks(xml, 'TimeSeries');
-  const byCode = new Map();
-  for (const s of series) {
-    const code = (xmlTagValue(s, 'psrType') || '').toUpperCase();
-    if (!code) continue;
-    let best = null;
-    for (const p of xmlBlocks(s, 'Period')) {
-      for (const point of parsePeriodPoints(p)) {
-        if (!best || point.dt > best.dt) best = point;
+  let byCode = new Map();
+  let usedUrl = ENTSOE_BASE;
+  for (const att of attempts) {
+    try {
+      const { xml, url } = await entsoeFetchXml({
+        securityToken: ENTSOE_TOKEN,
+        periodStart: fmt(start),
+        periodEnd: fmt(end),
+        ...att,
+      });
+      const series = xmlBlocks(xml, 'TimeSeries');
+      const nextByCode = new Map();
+      for (const s of series) {
+        const code = (xmlTagValue(s, 'psrType') || '').toUpperCase();
+        if (!code) continue;
+        let best = null;
+        for (const p of xmlBlocks(s, 'Period')) {
+          for (const point of parsePeriodPoints(p)) {
+            if (!best || point.dt > best.dt) best = point;
+          }
+        }
+        if (best) nextByCode.set(code, best.value);
       }
+      if (nextByCode.size) {
+        byCode = nextByCode;
+        usedUrl = url;
+        break;
+      }
+    } catch {
+      // try next
     }
-    if (best) byCode.set(code, best.value);
   }
 
   const categoryCodes = {
@@ -369,7 +399,7 @@ async function getEntsoeGenerationMixShare() {
     unit: '',
     valueText: 'Verhouding per bron',
     source: 'ENTSO-E Transparency API',
-    sourceUrl: url,
+    sourceUrl: usedUrl,
     updatedAt: new Date().toISOString(),
     detail: 'Relatieve verdeling per opwekbron',
     rows: rows.map((r) => ({ hour: r.label, value: (r.mw / total) * 100, unit: '%' })),
@@ -675,7 +705,7 @@ async function getNlGasImport() {
   for (const r of rowsAtTs) {
     const m = meta.get(String(r.pointKey || '')) || {};
     const pointType = String(m.pointType || '');
-    const country = String(m.adjacentCountry || '');
+    const country = String(m.adjacentCountry || m.adjacentCountryCode || r.adjacentCountry || '');
     const label = String(m.pointLabel || '').toLowerCase();
     const direction = String(r.directionKey || '').toLowerCase();
     const val = entsogGwhDay(r.value, r.unit);
@@ -707,6 +737,19 @@ async function getNlGasImport() {
   rows.push({ hour: 'LNG (Gate+EET)', value: lng, unit: 'GWh/d' });
   rows.push({ hour: 'Gasopslag (4 sites)', value: storage, unit: 'GWh/d' });
 
+  // If country codes are missing in ENTSOG metadata, still show a useful net value.
+  if (rows.slice(0, 5).every((r) => r.value === null)) {
+    let net = 0;
+    for (const r of rowsAtTs) {
+      const direction = String(r.directionKey || '').toLowerCase();
+      const val = entsogGwhDay(r.value, r.unit);
+      if (val === null) continue;
+      if (direction === 'entry') net += val;
+      if (direction === 'exit') net -= val;
+    }
+    rows[1].value = net; // place fallback net on DE anchor to keep map readable
+  }
+
   const total = rows.reduce((s, r) => s + (r.value || 0), 0);
   return {
     id: 'nlGasImport',
@@ -722,24 +765,39 @@ async function getNlGasImport() {
 }
 
 async function getNlGasStorage() {
-  const sourceUrl = 'https://api.ned.nl/v1/utilizations';
   const now = new Date();
   const after = new Date(now.getTime() - 10 * 24 * 3600_000).toISOString().slice(0, 10);
-  const before = new Date(now.getTime() + 24 * 3600_000).toISOString().slice(0, 10);
-  const url = `${sourceUrl}?${query({ point: 0, granularity: 4, granularitytimezone: 0, 'validfrom[after]': after, itemsPerPage: 1200, type: 28, activity: 3 })}`;
-  const payload = await fetchJson(url, {
-    'X-AUTH-TOKEN': NED_TOKEN,
-    authorization: `Bearer ${NED_TOKEN}`,
-    accept: 'application/ld+json, application/json',
-  });
-
-  const rows = payload?.['hydra:member'] || payload?.member || payload?.items || payload?.data || [];
+  const attempts = [
+    { type: 28, activity: 3 },
+    { type: 58, activity: 3 },
+    { type: 58, activity: 1 },
+    { type: 57, activity: 3 },
+    { type: 57, activity: 1 },
+    { type: 56, activity: 3 },
+    { type: 56, activity: 1 },
+    { type: 60, activity: 3 },
+    { type: 60, activity: 1 },
+    { type: 28 },
+  ];
+  let rows = [];
+  let url = 'https://api.ned.nl/v1/utilizations';
+  let lastErr = null;
+  for (const att of attempts) {
+    try {
+      const res = await fetchNedUtilizations({ point: 0, granularity: 4, granularitytimezone: 0, 'validfrom[after]': after, itemsPerPage: 1200, ...att });
+      rows = res.rows;
+      url = res.url;
+      if (rows.length) break;
+    } catch (err) {
+      lastErr = err;
+    }
+  }
   if (!Array.isArray(rows) || !rows.length) throw new Error('No NED storage rows');
   const parsed = rows
-    .map((r) => ({ dt: parseIsoUtc(r.validfrom || r.timestamp || r.date), pct: toNumber(r.percentage ?? r.value), rec: r }))
+    .map((r) => ({ dt: parseIsoUtc(r.validfrom || r.timestamp || r.date), pct: toNumber(r.percentage ?? r.value ?? r.capacity), rec: r }))
     .filter((x) => x.dt && x.pct !== null)
     .sort((a, b) => a.dt - b.dt);
-  if (!parsed.length) throw new Error('No parseable NED storage row');
+  if (!parsed.length) throw new Error(`No parseable NED storage row${lastErr ? ` (${String(lastErr.message || lastErr)})` : ''}`);
   const latest = parsed[parsed.length - 1];
   const pct = latest.pct <= 1 ? latest.pct * 100 : latest.pct;
   const gwh = 136780 * (pct / 100);
@@ -774,13 +832,23 @@ async function getNlGasConsumptionBreakdown() {
 
   const totals = [];
   for (const [type, label] of map) {
-    const url = `${sourceUrl}?${query({ point: 0, granularity: 4, granularitytimezone: 0, 'validfrom[after]': after, itemsPerPage: 1200, type, activity: 2 })}`;
-    const payload = await fetchJson(url, {
-      'X-AUTH-TOKEN': NED_TOKEN,
-      authorization: `Bearer ${NED_TOKEN}`,
-      accept: 'application/ld+json, application/json',
-    });
-    const rows = payload?.['hydra:member'] || payload?.member || payload?.items || payload?.data || [];
+    let rows = [];
+    let localUrl = sourceUrl;
+    const attempts = [
+      { type, activity: 2 },
+      { type, activity: 1 },
+      { type },
+    ];
+    for (const att of attempts) {
+      try {
+        const res = await fetchNedUtilizations({ point: 0, granularity: 4, granularitytimezone: 0, 'validfrom[after]': after, itemsPerPage: 1200, ...att });
+        rows = res.rows;
+        localUrl = res.url;
+        if (rows.length) break;
+      } catch {
+        // try next
+      }
+    }
     const parsed = (Array.isArray(rows) ? rows : [])
       .map((r) => ({ dt: parseIsoUtc(r.validfrom || r.timestamp || r.date), value: toNumber(r.capacity ?? r.value ?? r.volume) }))
       .filter((x) => x.dt && x.value !== null)
@@ -804,6 +872,45 @@ async function getNlGasConsumptionBreakdown() {
     updatedAt: totals.map((t) => t[2]).sort().at(-1) || new Date().toISOString(),
     detail: 'Onderverdeling hieronder in percentages',
     rows,
+  };
+}
+
+async function getGaslichtCheapest(kind) {
+  const isGas = kind === 'gas';
+  const sourceUrl = isGas
+    ? 'https://www.gaslicht.com/gas-vergelijken/resultaten?showonlyswitchable=False&contracttype=Vast&gasverbruik=1000'
+    : 'https://www.gaslicht.com/stroom-vergelijken/resultaten?showonlyswitchable=False&contracttype=Vast&stroomhoogverbruik=1000&stroomlaagverbruik=1000';
+  const html = await fetchText(sourceUrl, {}, 15000);
+  const unit = isGas ? 'EUR/m3' : 'EUR/kWh';
+
+  const patterns = isGas
+    ? [
+        /([0-9]+[.,][0-9]{2,4})\s*(?:€|EUR)?\s*\/\s*(?:m3|m³)/i,
+        /(?:m3|m³)[^0-9]{0,16}([0-9]+[.,][0-9]{2,4})/i,
+      ]
+    : [
+        /([0-9]+[.,][0-9]{3,5})\s*(?:€|EUR)?\s*\/\s*kwh/i,
+        /kwh[^0-9]{0,16}([0-9]+[.,][0-9]{3,5})/i,
+      ];
+  let value = null;
+  for (const re of patterns) {
+    const m = html.match(re);
+    if (m) {
+      value = toNumber(m[1]);
+      if (value !== null) break;
+    }
+  }
+  if (value === null) throw new Error('Could not parse Gaslicht cheapest price');
+
+  return {
+    id: isGas ? 'gaslichtGas' : 'gaslichtElectricity',
+    label: isGas ? 'Cheapest Gas Provider (Gaslicht)' : 'Cheapest Electricity Provider (Gaslicht)',
+    value,
+    unit,
+    source: 'Gaslicht',
+    sourceUrl,
+    updatedAt: new Date().toISOString(),
+    detail: 'Indicatie van goedkoopste vaste tariefresultaat',
   };
 }
 
@@ -832,12 +939,12 @@ async function collectOverview() {
     [getNlGasConsumptionBreakdown, { id: 'nlGasConsumptionBreakdown', label: 'Gasconsumptie NL (laatste volledige dag)', value: null, unit: 'GWh/d', source: 'NED API', sourceUrl: 'https://api.ned.nl/v1/utilizations', updatedAt: new Date().toISOString(), detail: 'Bron tijdelijk niet bereikbaar', rows: [] }],
     [getTennetRegulation, { id: 'tennetRegulation', label: 'TenneT Balance Delta (actueel, 12s)', value: null, unit: 'MW', source: 'TenneT API (Balance Delta High Res)', sourceUrl: 'https://api.tennet.eu/publications/v1/balance-delta-high-res/latest', updatedAt: new Date().toISOString(), detail: 'Bron tijdelijk niet bereikbaar' }],
     [getTennetSettlement, { id: 'tennetSettlement', label: 'TenneT Settlement Price (actueel)', value: null, unit: 'EUR/MWh', source: 'TenneT API (Settlement Prices)', sourceUrl: 'https://api.tennet.eu/publications/v1/settlement-prices', updatedAt: new Date().toISOString(), detail: 'Bron tijdelijk niet bereikbaar' }],
+    [() => getGaslichtCheapest('power'), { id: 'gaslichtElectricity', label: 'Cheapest Electricity Provider (Gaslicht)', value: null, unit: 'EUR/kWh', source: 'Gaslicht', sourceUrl: 'https://www.gaslicht.com/stroom-vergelijken/resultaten?showonlyswitchable=False&contracttype=Vast&stroomhoogverbruik=1000&stroomlaagverbruik=1000', updatedAt: new Date().toISOString(), detail: 'Bron tijdelijk niet bereikbaar' }],
+    [() => getGaslichtCheapest('gas'), { id: 'gaslichtGas', label: 'Cheapest Gas Provider (Gaslicht)', value: null, unit: 'EUR/m3', source: 'Gaslicht', sourceUrl: 'https://www.gaslicht.com/gas-vergelijken/resultaten?showonlyswitchable=False&contracttype=Vast&gasverbruik=1000', updatedAt: new Date().toISOString(), detail: 'Bron tijdelijk niet bereikbaar' }],
   ];
 
-  // Keep the same card layout; unavailable Gaslicht sources stay visible with placeholders.
+  // Keep the same card layout for remaining Gaslicht cards that are not migrated yet.
   const staticFallbacks = [
-    { id: 'gaslichtElectricity', label: 'Cheapest Electricity Provider (Gaslicht)', value: null, unit: 'EUR/kWh', source: 'Gaslicht', sourceUrl: 'https://www.gaslicht.com/stroom-vergelijken/resultaten?showonlyswitchable=False&contracttype=Vast&stroomhoogverbruik=1000&stroomlaagverbruik=1000', updatedAt: new Date().toISOString(), detail: 'Deze scraper is nog niet omgezet naar JavaScript backend' },
-    { id: 'gaslichtGas', label: 'Cheapest Gas Provider (Gaslicht)', value: null, unit: 'EUR/m3', source: 'Gaslicht', sourceUrl: 'https://www.gaslicht.com/gas-vergelijken/resultaten?showonlyswitchable=False&contracttype=Vast&gasverbruik=1000', updatedAt: new Date().toISOString(), detail: 'Deze scraper is nog niet omgezet naar JavaScript backend' },
     { id: 'gaslichtLongestContract', label: 'Langste Contractduur (Gaslicht)', value: null, unit: 'jaar', source: 'Gaslicht', sourceUrl: 'https://www.gaslicht.com/energievergelijken/', updatedAt: new Date().toISOString(), detail: 'Deze scraper is nog niet omgezet naar JavaScript backend' },
     { id: 'gaslichtLongestContractElectricity', label: 'Langste Contractduur Stroom', value: null, unit: 'jaar', source: 'Gaslicht', sourceUrl: 'https://www.gaslicht.com/stroom-vergelijken/resultaten?showonlyswitchable=False&contracttype=Vast&stroomhoogverbruik=1000&stroomlaagverbruik=1000', updatedAt: new Date().toISOString(), detail: 'Deze scraper is nog niet omgezet naar JavaScript backend' },
   ];
