@@ -95,6 +95,19 @@ function extractRowsFromPayload(payload) {
   return [];
 }
 
+function htmlDecode(text) {
+  if (typeof text !== 'string') return '';
+  return text
+    .replace(/&quot;/g, '"')
+    .replace(/&#34;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&#39;/g, "'")
+    .replace(/&amp;/g, '&')
+    .replace(/&#x2F;/gi, '/')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>');
+}
+
 function pickLatestRow(rows) {
   if (!Array.isArray(rows) || !rows.length) return null;
   const rowScore = (r) => {
@@ -508,6 +521,86 @@ async function getNedGenerationMixShare() {
   };
 }
 
+async function getNedGenerationMixShareFromUtilizations() {
+  const now = new Date();
+  const after = new Date(now.getTime() - 3 * 24 * 3600_000).toISOString().slice(0, 10);
+  const types = [
+    [1, 'Wind'],
+    [17, 'Wind'],
+    [2, 'Zon'],
+    [18, 'Gascentrales'],
+    [19, 'Kolencentrales'],
+    [20, 'Kernenergie'],
+    [21, 'Afval'],
+    [25, 'Biomassa'],
+    [26, 'Afval'],
+  ];
+
+  const sums = new Map();
+  let sourceUrl = 'https://api.ned.nl/v1/utilizations';
+  let latestDt = null;
+  for (const [type, label] of types) {
+    let best = null;
+    let bestDt = null;
+    let localUrl = sourceUrl;
+    const attempts = [
+      { type, activity: 1 },
+      { type, activity: 2 },
+      { type },
+    ];
+    for (const att of attempts) {
+      try {
+        const res = await fetchNedUtilizations({
+          point: 0,
+          granularity: 4,
+          granularitytimezone: 0,
+          'validfrom[after]': after,
+          itemsPerPage: 800,
+          ...att,
+        });
+        localUrl = res.url;
+        for (const r of res.rows) {
+          const dt = parseIsoUtc(r.validfrom || r.timestamp || r.date);
+          const mw = nedValueToMw(r);
+          if (!dt || mw === null || mw <= 0) continue;
+          if (!bestDt || dt > bestDt) {
+            bestDt = dt;
+            best = mw;
+          }
+        }
+        if (best !== null) break;
+      } catch {
+        // try next
+      }
+    }
+    if (best !== null) {
+      sums.set(label, (sums.get(label) || 0) + best);
+      sourceUrl = localUrl;
+      if (!latestDt || (bestDt && bestDt > latestDt)) latestDt = bestDt;
+    }
+  }
+
+  const total = Array.from(sums.values()).reduce((a, b) => a + b, 0);
+  if (!(total > 0)) throw new Error('No NED utilizations generation mix values');
+  const order = ['Gascentrales', 'Kolencentrales', 'Afval', 'Zon', 'Wind', 'Biomassa', 'Kernenergie'];
+  const rows = order
+    .map((k) => (sums.get(k) ? { hour: k, value: (sums.get(k) / total) * 100, unit: '%' } : null))
+    .filter(Boolean);
+
+  return {
+    id: 'nlGenerationMixShare',
+    label: 'Opwek Mix NL (actuele verhouding)',
+    value: null,
+    unit: '',
+    valueText: 'Verhouding per bron',
+    source: 'NED API (utilizations fallback)',
+    sourceUrl,
+    updatedAt: (latestDt || new Date()).toISOString(),
+    detail: 'Relatieve verdeling per opwekbron (NED utilizations fallback)',
+    rows,
+  };
+}
+
 async function getNedGenerationMixShareFromDataportaal() {
   const pageUrl = 'https://ned.nl/nl/dataportaal/energie-productie/elektriciteit/totale-elektriciteitsproductie';
   const pageHtml = await fetchText(pageUrl, {}, 15000);
@@ -604,9 +697,13 @@ async function getGenerationMixShare() {
     return await getNedGenerationMixShareFromDataportaal();
   } catch {
     try {
-      return await getEntsoeGenerationMixShare();
+      return await getNedGenerationMixShareFromUtilizations();
     } catch {
-      return getNedGenerationMixShare();
+      try {
+        return await getEntsoeGenerationMixShare();
+      } catch {
+        return getNedGenerationMixShare();
+      }
     }
   }
 }
@@ -1197,6 +1294,101 @@ async function getGaslichtCheapest(kind) {
     : 'https://www.gaslicht.com/stroom-vergelijken/resultaten?showonlyswitchable=False&contracttype=Vast&stroomhoogverbruik=1000&stroomlaagverbruik=1000';
   const html = await fetchText(sourceUrl, {}, 15000);
   const unit = isGas ? 'EUR/m3' : 'EUR/kWh';
+  const usage = isGas ? 1000 : 2000;
+
+  // Preferred path: parse Gaslicht product payloads.
+  const products = [];
+  const productRe = /data-product=(?:"([^"]+)"|'([^']+)')/gi;
+  let pm;
+  while ((pm = productRe.exec(html))) {
+    const raw = htmlDecode(pm[1] || pm[2] || '');
+    try {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === 'object') products.push(parsed);
+    } catch {
+      // skip invalid payload
+    }
+  }
+
+  const impressions = [];
+  const impRe = /data-js-gtminfo="([^"]*Impressions[^"]*)"/gi;
+  let im;
+  while ((im = impRe.exec(html))) {
+    const raw = htmlDecode(im[1] || '');
+    try {
+      const parsed = JSON.parse(raw);
+      const arr = parsed?.Ecommerce?.Impressions || [];
+      if (Array.isArray(arr)) impressions.push(...arr);
+    } catch {
+      // skip invalid payload
+    }
+  }
+
+  const productCost = (p) => {
+    const totalKeys = ['PackageCosts', 'Price', 'PackageCost', 'TotalPrice', 'MonthlyCosts'];
+    const bonusKeys = ['WelcomeBonus', 'welcomeBonus', 'Bonus'];
+    let total = null;
+    for (const k of totalKeys) {
+      const n = toNumber(p?.[k]);
+      if (n !== null) {
+        total = n;
+        break;
+      }
+    }
+    if (total === null) return null;
+    let bonus = 0;
+    for (const k of bonusKeys) {
+      const n = toNumber(p?.[k]);
+      if (n !== null) {
+        bonus = n;
+        break;
+      }
+    }
+    return total + bonus;
+  };
+
+  if (products.length) {
+    let best = null;
+    let bestCost = null;
+    for (const p of products) {
+      const c = productCost(p);
+      if (c === null) continue;
+      if (best === null || c < bestCost) {
+        best = p;
+        bestCost = c;
+      }
+    }
+    if (best && bestCost !== null) {
+      const pkg = String(best?.PackageUrl || '');
+      const src = pkg.startsWith('/') ? `https://www.gaslicht.com${pkg}` : sourceUrl;
+      return {
+        id: isGas ? 'gaslichtGas' : 'gaslichtElectricity',
+        label: isGas ? 'Cheapest Gas Provider (Gaslicht)' : 'Cheapest Electricity Provider (Gaslicht)',
+        value: bestCost / usage,
+        unit,
+        source: 'Gaslicht',
+        sourceUrl: src,
+        updatedAt: new Date().toISOString(),
+        detail: 'Goedkoopste contract op basis van productfeed (jaarkosten/bonus)',
+      };
+    }
+  }
+
+  if (impressions.length) {
+    const prices = impressions.map((x) => toNumber(x?.Price)).filter((x) => x !== null).sort((a, b) => a - b);
+    if (prices.length) {
+      return {
+        id: isGas ? 'gaslichtGas' : 'gaslichtElectricity',
+        label: isGas ? 'Cheapest Gas Provider (Gaslicht)' : 'Cheapest Electricity Provider (Gaslicht)',
+        value: prices[0] / usage,
+        unit,
+        source: 'Gaslicht',
+        sourceUrl,
+        updatedAt: new Date().toISOString(),
+        detail: 'Goedkoopste contract via GTM impression feed',
+      };
+    }
+  }
 
   const patterns = isGas
     ? [
@@ -1247,7 +1439,7 @@ async function getGaslichtCheapest(kind) {
     }
     const annual = annualVals.filter((n) => n > 50 && n < 10000).sort((a, b) => a - b)[0];
     if (annual) {
-      value = isGas ? annual / 1000 : annual / 2000;
+      value = annual / usage;
     }
   }
 
