@@ -43,7 +43,8 @@ Hostingsecrets (voor FTP deploy):
 - `FTP_USERNAME`
 - `FTP_PASSWORD`
 - `FTP_PORT` (meestal `21`)
-- `FTP_REMOTE_DIR` (bijv. `/public_html/`)
+
+De deploy-workflow staat vast op `energydashboard.snarfia.nl/` als doelmap.
 
 ## npm scripts
 

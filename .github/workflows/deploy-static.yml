@@ -24,4 +24,4 @@ jobs:
           password: ${{ secrets.FTP_PASSWORD }}
           port: ${{ secrets.FTP_PORT }}
           local-dir: ./static/
-          server-dir: ${{ secrets.FTP_REMOTE_DIR }}
+          server-dir: energydashboard.snarfia.nl/
