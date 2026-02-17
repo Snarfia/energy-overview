@@ -86,6 +86,24 @@ async function fetchNedUtilizations(params) {
   return { rows: Array.isArray(rows) ? rows : [], url };
 }
 
+function extractRowsFromPayload(payload) {
+  if (!payload || typeof payload !== 'object') return [];
+  if (Array.isArray(payload.rows)) return payload.rows;
+  if (Array.isArray(payload.data?.rows)) return payload.data.rows;
+  if (Array.isArray(payload.items)) return payload.items;
+  if (Array.isArray(payload.data)) return payload.data;
+  return [];
+}
+
+function pickLatestRow(rows) {
+  if (!Array.isArray(rows) || !rows.length) return null;
+  const rowScore = (r) => {
+    const d = parseIsoUtc(r?.datum || r?.date || r?.time || r?.timestamp || r?.validfrom || '');
+    return d ? d.getTime() : -1;
+  };
+  return [...rows].sort((a, b) => rowScore(a) - rowScore(b)).at(-1) || rows[rows.length - 1];
+}
+
 function xmlTagValue(block, tagName) {
   const safe = tagName.replace('.', '\\.');
   const re = new RegExp(`<[^>]*${safe}[^>]*>([\\s\\S]*?)<\\/[^>]*${safe}>`, 'i');
@@ -490,11 +508,106 @@ async function getNedGenerationMixShare() {
   };
 }
 
+async function getNedGenerationMixShareFromDataportaal() {
+  const pageUrl = 'https://ned.nl/nl/dataportaal/energie-productie/elektriciteit/totale-elektriciteitsproductie';
+  const pageHtml = await fetchText(pageUrl, {}, 15000);
+  const candidates = new Set(['totale-elektriciteitsproductie', 'elektriciteitsproductie']);
+
+  const patterns = [
+    /grafiek\/data\/([a-z0-9-]+)\/current/gi,
+    /data-dataset=["']([a-z0-9-]+)["']/gi,
+    /dataset["']?\s*:\s*["']([a-z0-9-]+)["']/gi,
+  ];
+  for (const re of patterns) {
+    let m;
+    while ((m = re.exec(pageHtml))) {
+      if (m?.[1]) candidates.add(String(m[1]));
+    }
+  }
+
+  let lastErr = null;
+  for (const dataset of candidates) {
+    try {
+      const dataUrl = `https://www.energieopwek.nl/grafiek/data/${dataset}/current`;
+      const payload = await fetchJson(dataUrl, {}, 15000);
+      const rows = extractRowsFromPayload(payload);
+      const latest = pickLatestRow(rows);
+      if (!latest || typeof latest !== 'object') continue;
+
+      // Try both wide rows (many numeric columns) and narrow rows (label/value pairs).
+      const sums = {
+        Gascentrales: 0,
+        Kolencentrales: 0,
+        Afval: 0,
+        Zon: 0,
+        Wind: 0,
+        Biomassa: 0,
+        Kernenergie: 0,
+      };
+
+      const mapLabel = (name) => {
+        const k = String(name || '').toLowerCase();
+        if (k.includes('gas')) return 'Gascentrales';
+        if (k.includes('kool') || k.includes('coal')) return 'Kolencentrales';
+        if (k.includes('afval')) return 'Afval';
+        if (k.includes('zon') || k.includes('solar') || k.includes('pv')) return 'Zon';
+        if (k.includes('wind')) return 'Wind';
+        if (k.includes('biomass')) return 'Biomassa';
+        if (k.includes('kern') || k.includes('nuclear')) return 'Kernenergie';
+        return null;
+      };
+
+      // wide style
+      for (const [key, value] of Object.entries(latest)) {
+        if (['datum', 'date', 'time', 'timestamp', 'validfrom', 'total', 'totaal'].includes(String(key).toLowerCase())) continue;
+        const label = mapLabel(key);
+        const n = toNumber(value);
+        if (!label || n === null || n <= 0) continue;
+        sums[label] += n;
+      }
+      // narrow style fallback
+      if (Object.values(sums).reduce((a, b) => a + b, 0) <= 0) {
+        for (const row of rows) {
+          const label = mapLabel(row?.naam || row?.name || row?.label || row?.type || row?.bron);
+          const n = toNumber(row?.value ?? row?.vermogen ?? row?.mw ?? row?.amount);
+          if (!label || n === null || n <= 0) continue;
+          sums[label] += n;
+        }
+      }
+
+      const total = Object.values(sums).reduce((a, b) => a + b, 0);
+      if (!(total > 0)) throw new Error('No NED dataportaal mix values');
+      const order = ['Gascentrales', 'Kolencentrales', 'Afval', 'Zon', 'Wind', 'Biomassa', 'Kernenergie'];
+      const outRows = order.filter((k) => sums[k] > 0).map((k) => ({ hour: k, value: (sums[k] / total) * 100, unit: '%' }));
+
+      return {
+        id: 'nlGenerationMixShare',
+        label: 'Opwek Mix NL (actuele verhouding)',
+        value: null,
+        unit: '',
+        valueText: 'Verhouding per bron',
+        source: 'NED Dataportaal',
+        sourceUrl: pageUrl,
+        updatedAt: new Date().toISOString(),
+        detail: 'Relatieve verdeling per opwekbron (vandaag) via NED dataportaal',
+        rows: outRows,
+      };
+    } catch (err) {
+      lastErr = err;
+    }
+  }
+  throw new Error(`No NED generation mix values${lastErr ? ` (${String(lastErr.message || lastErr)})` : ''}`);
+}
+
 async function getGenerationMixShare() {
   try {
-    return await getEntsoeGenerationMixShare();
+    return await getNedGenerationMixShareFromDataportaal();
   } catch {
-    return getNedGenerationMixShare();
+    try {
+      return await getEntsoeGenerationMixShare();
+    } catch {
+      return getNedGenerationMixShare();
+    }
   }
 }
 
@@ -871,6 +984,43 @@ async function getNlGasImport() {
 }
 
 async function getNlGasStorage() {
+  const pageUrl = 'https://ned.nl/nl/gasopslagen-nederland';
+  try {
+    const page = await fetchText(pageUrl, {}, 15000);
+    const patterns = [
+      /actuele\s+vullingsgraad[^0-9%]{0,120}([0-9]+(?:[.,][0-9]+)?)\s*%/i,
+      /vullingsgraad[^0-9%]{0,120}([0-9]+(?:[.,][0-9]+)?)\s*%/i,
+      /is\s+momenteel[^0-9%]{0,60}([0-9]+(?:[.,][0-9]+)?)\s*%/i,
+      /([0-9]+(?:[.,][0-9]+)?)\s*%\s*(?:gevuld|vulling|vullingsgraad)/i,
+      /"percentage"\s*:\s*"?([0-9]+(?:[.,][0-9]+)?)"?/i,
+    ];
+    let pct = null;
+    for (const re of patterns) {
+      const m = page.match(re);
+      if (m) {
+        pct = toNumber(m[1]);
+        if (pct !== null) break;
+      }
+    }
+    if (pct !== null) {
+      const normalized = pct <= 1 ? pct * 100 : pct;
+      const gwh = 136780 * (normalized / 100);
+      return {
+        id: 'nlGasStorage',
+        label: 'NL Gasopslag (actueel)',
+        value: normalized,
+        unit: '%',
+        source: 'NED Website',
+        sourceUrl: pageUrl,
+        updatedAt: new Date().toISOString(),
+        detail: 'Actuele nationale vullingsgraad van NED',
+        rows: [{ hour: 'Opslaginhoud', value: gwh, unit: 'GWh' }],
+      };
+    }
+  } catch {
+    // continue with API fallback chain below
+  }
+
   const now = new Date();
   const after = new Date(now.getTime() - 10 * 24 * 3600_000).toISOString().slice(0, 10);
   const attempts = [
@@ -1081,6 +1231,26 @@ async function getGaslichtCheapest(kind) {
       }
     }
   }
+  // Annual-price fallback: convert to unit price using fixed profile from URL params.
+  if (value === null) {
+    const annualPatterns = [
+      /([0-9]{2,5}(?:[.,][0-9]{1,2})?)\s*(?:€|EUR)?\s*(?:per\s*jaar|\/\s*jaar|p\/j)/ig,
+      /(?:jaarprijs|jaarkosten|annual)[^0-9]{0,12}([0-9]{2,5}(?:[.,][0-9]{1,2})?)/ig,
+    ];
+    const annualVals = [];
+    for (const re of annualPatterns) {
+      let m;
+      while ((m = re.exec(html))) {
+        const n = toNumber(m[1]);
+        if (n !== null) annualVals.push(n);
+      }
+    }
+    const annual = annualVals.filter((n) => n > 50 && n < 10000).sort((a, b) => a - b)[0];
+    if (annual) {
+      value = isGas ? annual / 1000 : annual / 2000;
+    }
+  }
+
   if (value === null) throw new Error('Could not parse Gaslicht cheapest price');
 
   return {
@@ -1093,6 +1263,14 @@ async function getGaslichtCheapest(kind) {
     updatedAt: new Date().toISOString(),
     detail: 'Indicatie van goedkoopste vaste tariefresultaat',
   };
+}
+
+async function getGaslichtCheapestElectricity() {
+  return getGaslichtCheapest('power');
+}
+
+async function getGaslichtCheapestGas() {
+  return getGaslichtCheapest('gas');
 }
 
 async function collectOverview() {
@@ -1126,8 +1304,8 @@ async function collectOverview() {
     }, { id: 'nlGasConsumptionBreakdown', label: 'Gasconsumptie NL (laatste volledige dag)', value: null, unit: 'GWh/d', source: 'NED API', sourceUrl: 'https://api.ned.nl/v1/utilizations', updatedAt: new Date().toISOString(), detail: 'Bron tijdelijk niet bereikbaar', rows: [] }],
     [getTennetRegulation, { id: 'tennetRegulation', label: 'TenneT Balance Delta (actueel, 12s)', value: null, unit: 'MW', source: 'TenneT API (Balance Delta High Res)', sourceUrl: 'https://api.tennet.eu/publications/v1/balance-delta-high-res/latest', updatedAt: new Date().toISOString(), detail: 'Bron tijdelijk niet bereikbaar' }],
     [getTennetSettlement, { id: 'tennetSettlement', label: 'TenneT Settlement Price (actueel)', value: null, unit: 'EUR/MWh', source: 'TenneT API (Settlement Prices)', sourceUrl: 'https://api.tennet.eu/publications/v1/settlement-prices', updatedAt: new Date().toISOString(), detail: 'Bron tijdelijk niet bereikbaar' }],
-    [() => getGaslichtCheapest('power'), { id: 'gaslichtElectricity', label: 'Cheapest Electricity Provider (Gaslicht)', value: null, unit: 'EUR/kWh', source: 'Gaslicht', sourceUrl: 'https://www.gaslicht.com/stroom-vergelijken/resultaten?showonlyswitchable=False&contracttype=Vast&stroomhoogverbruik=1000&stroomlaagverbruik=1000', updatedAt: new Date().toISOString(), detail: 'Bron tijdelijk niet bereikbaar' }],
-    [() => getGaslichtCheapest('gas'), { id: 'gaslichtGas', label: 'Cheapest Gas Provider (Gaslicht)', value: null, unit: 'EUR/m3', source: 'Gaslicht', sourceUrl: 'https://www.gaslicht.com/gas-vergelijken/resultaten?showonlyswitchable=False&contracttype=Vast&gasverbruik=1000', updatedAt: new Date().toISOString(), detail: 'Bron tijdelijk niet bereikbaar' }],
+    [getGaslichtCheapestElectricity, { id: 'gaslichtElectricity', label: 'Cheapest Electricity Provider (Gaslicht)', value: null, unit: 'EUR/kWh', source: 'Gaslicht', sourceUrl: 'https://www.gaslicht.com/stroom-vergelijken/resultaten?showonlyswitchable=False&contracttype=Vast&stroomhoogverbruik=1000&stroomlaagverbruik=1000', updatedAt: new Date().toISOString(), detail: 'Bron tijdelijk niet bereikbaar' }],
+    [getGaslichtCheapestGas, { id: 'gaslichtGas', label: 'Cheapest Gas Provider (Gaslicht)', value: null, unit: 'EUR/m3', source: 'Gaslicht', sourceUrl: 'https://www.gaslicht.com/gas-vergelijken/resultaten?showonlyswitchable=False&contracttype=Vast&gasverbruik=1000', updatedAt: new Date().toISOString(), detail: 'Bron tijdelijk niet bereikbaar' }],
   ];
 
   // Keep the same card layout for remaining Gaslicht cards that are not migrated yet.
