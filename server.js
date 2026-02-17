@@ -170,9 +170,25 @@ function hasUsefulValue(item) {
 function cachedItemWithError(cachedItem, err) {
   const next = { ...cachedItem };
   const msg = err ? `tijdelijke bronstoring, laatste geldige waarde getoond | fout: ${String(err.message || err)}` : 'tijdelijke bronstoring, laatste geldige waarde getoond';
-  next.detail = next.detail ? `${next.detail} | ${msg}` : msg;
+  next.detail = String(next.detail || '').includes('tijdelijke bronstoring') ? String(next.detail || '') : (next.detail ? `${next.detail} | ${msg}` : msg);
   next.updatedAt = new Date().toISOString();
   return next;
+}
+
+function sanitizeSourceUrl(raw) {
+  if (!raw) return raw;
+  try {
+    const u = new URL(raw);
+    for (const key of ['securityToken', 'apikey', 'authorization', 'token']) {
+      u.searchParams.delete(key);
+    }
+    // Keep links user-friendly for cards.
+    if (u.hostname.includes('web-api.tp.entsoe.eu')) return `${u.origin}${u.pathname}`;
+    if (u.hostname.includes('api.tennet.eu')) return `${u.origin}${u.pathname}`;
+    return u.toString();
+  } catch {
+    return raw;
+  }
 }
 
 async function getDayAheadPower24h() {
@@ -240,12 +256,33 @@ async function getDayAheadPower24h() {
 
 async function getTTFGas() {
   const sourceUrl = 'https://tradingeconomics.com/commodity/eu-natural-gas';
-  const html = await fetchText(sourceUrl);
-  const m = html.match(/TEChartsMeta\s*=\s*(\[.*?\]);/s);
-  if (!m) throw new Error('Could not parse TTF from TradingEconomics');
-  const arr = JSON.parse(m[1]);
-  const value = toNumber(arr?.[0]?.last);
-  if (value === null) throw new Error('No TTF last value');
+  let value = null;
+  try {
+    const html = await fetchText(sourceUrl);
+    const m = html.match(/TEChartsMeta\s*=\s*(\[.*?\]);/s);
+    if (m) {
+      const arr = JSON.parse(m[1]);
+      value = toNumber(arr?.[0]?.last);
+    }
+  } catch {
+    // fallback below
+  }
+  if (value === null) {
+    const altUrl = 'https://markets.businessinsider.com/commodities/dutch-ttf-gas';
+    const html2 = await fetchText(altUrl);
+    const m2 = html2.match(/"price"\s*:\s*{"raw"\s*:\s*([0-9]+(?:\.[0-9]+)?)/i) || html2.match(/currentValue":([0-9]+(?:\.[0-9]+)?)/i);
+    value = m2 ? toNumber(m2[1]) : null;
+    if (value === null) throw new Error('Could not parse TTF from primary/fallback source');
+    return {
+      id: 'ttfGas',
+      label: 'TTF Gas',
+      value,
+      unit: 'EUR/MWh',
+      source: 'Business Insider Markets (fallback)',
+      sourceUrl: altUrl,
+      updatedAt: new Date().toISOString(),
+    };
+  }
   return {
     id: 'ttfGas',
     label: 'TTF Gas',
@@ -527,7 +564,38 @@ async function getTennetSettlement() {
       points.push(...(Array.isArray(ps) ? ps : [ps]));
     }
   }
-  if (!points.length) throw new Error('No settlement points');
+  if (!points.length) {
+    // Fallback to latest balance-delta prices when settlement endpoint has gaps.
+    const bdUrl = 'https://api.tennet.eu/publications/v1/balance-delta-high-res/latest';
+    const payload2 = await fetchJson(bdUrl, { apikey: TENNET_TOKEN, accept: 'application/json' }, 12000);
+    const points2 = [];
+    const series2 = payload2?.Response?.TimeSeries || [];
+    for (const ts of Array.isArray(series2) ? series2 : [series2]) {
+      const periods2 = ts?.Period || [];
+      for (const period2 of Array.isArray(periods2) ? periods2 : [periods2]) {
+        const ps2 = period2?.points || period2?.Points || [];
+        points2.push(...(Array.isArray(ps2) ? ps2 : [ps2]));
+      }
+    }
+    if (!points2.length) throw new Error('No settlement points');
+    points2.sort((a, b) => String(a.timeInterval_end || '').localeCompare(String(b.timeInterval_end || '')));
+    const p2 = points2[points2.length - 1];
+    const mid = toNumber(p2.mid_price);
+    const up = toNumber(p2.max_upw_regulation_price);
+    const down = toNumber(p2.min_downw_regulation_price);
+    const value2 = mid ?? up ?? down;
+    if (value2 === null) throw new Error('No settlement points');
+    return {
+      id: 'tennetSettlement',
+      label: 'TenneT Settlement Price (actueel)',
+      value: value2,
+      unit: 'EUR/MWh',
+      source: 'TenneT API (fallback via Balance Delta)',
+      sourceUrl: bdUrl,
+      updatedAt: p2.timeInterval_end || p2.timeInterval_start || new Date().toISOString(),
+      detail: `Fallback | Mid ${mid ?? 'n/a'} | Up ${up ?? 'n/a'} | Down ${down ?? 'n/a'}`,
+    };
+  }
   points.sort((a, b) => String(a.timeInterval_end || '').localeCompare(String(b.timeInterval_end || '')));
   const p = points[points.length - 1];
   const shortage = toNumber(p.shortage);
@@ -658,7 +726,7 @@ async function getNlGasStorage() {
   const now = new Date();
   const after = new Date(now.getTime() - 10 * 24 * 3600_000).toISOString().slice(0, 10);
   const before = new Date(now.getTime() + 24 * 3600_000).toISOString().slice(0, 10);
-  const url = `${sourceUrl}?${query({ point: 0, granularity: 4, granularitytimezone: 0, 'validfrom[strictly_before]': before, 'validfrom[after]': after, itemsPerPage: 1200, type: 28, activity: 3 })}`;
+  const url = `${sourceUrl}?${query({ point: 0, granularity: 4, granularitytimezone: 0, 'validfrom[after]': after, itemsPerPage: 1200, type: 28, activity: 3 })}`;
   const payload = await fetchJson(url, {
     'X-AUTH-TOKEN': NED_TOKEN,
     authorization: `Bearer ${NED_TOKEN}`,
@@ -706,7 +774,7 @@ async function getNlGasConsumptionBreakdown() {
 
   const totals = [];
   for (const [type, label] of map) {
-    const url = `${sourceUrl}?${query({ point: 0, granularity: 4, granularitytimezone: 0, 'validfrom[strictly_before]': before, 'validfrom[after]': after, itemsPerPage: 1200, type, activity: 2 })}`;
+    const url = `${sourceUrl}?${query({ point: 0, granularity: 4, granularitytimezone: 0, 'validfrom[after]': after, itemsPerPage: 1200, type, activity: 2 })}`;
     const payload = await fetchJson(url, {
       'X-AUTH-TOKEN': NED_TOKEN,
       authorization: `Bearer ${NED_TOKEN}`,
@@ -790,10 +858,11 @@ async function collectOverview() {
   }
   items.push(...staticFallbacks);
 
+  const cleanedItems = items.map((it) => ({ ...it, sourceUrl: sanitizeSourceUrl(it?.sourceUrl) }));
   return {
     generatedAt: new Date().toISOString(),
     durationMs: Date.now() - started,
-    items,
+    items: cleanedItems,
     errors,
     note: 'Data is fetched from public APIs/sources and may lag or change format.',
   };
