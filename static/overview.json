@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-02-17T16:44:24.078Z",
-  "durationMs": 18069,
+  "generatedAt": "2026-02-17T16:49:34.947Z",
+  "durationMs": 24270,
   "items": [
     {
       "id": "dayAheadPower24h",
@@ -9,7 +9,7 @@
       "unit": "EUR/MWh",
       "source": "ENTSO-E Transparency API (EPEX SPOT NL)",
       "sourceUrl": "https://web-api.tp.entsoe.eu/api",
-      "updatedAt": "2026-02-17T16:44:07.303Z",
+      "updatedAt": "2026-02-17T16:49:11.695Z",
       "detail": "Komende 24 uur per uur",
       "rows": [
         {
@@ -137,12 +137,11 @@
     {
       "id": "ttfGas",
       "label": "TTF Gas",
-      "value": 30.6144,
+      "value": 29.9696,
       "unit": "EUR/MWh",
       "source": "TradingEconomics",
       "sourceUrl": "https://tradingeconomics.com/commodity/eu-natural-gas",
-      "updatedAt": "2026-02-17T16:44:10.897Z",
-      "detail": "tijdelijke bronstoring, laatste geldige waarde getoond | fout: Could not parse TTF from TradingEconomics | tijdelijke bronstoring, laatste geldige waarde getoond | fout: Could not parse TTF from TradingEconomics"
+      "updatedAt": "2026-02-17T16:49:11.808Z"
     },
     {
       "id": "ets",
@@ -161,7 +160,7 @@
       "valueText": "Verhouding per bron",
       "source": "ENTSO-E Transparency API",
       "sourceUrl": "https://web-api.tp.entsoe.eu/api",
-      "updatedAt": "2026-02-17T16:44:12.435Z",
+      "updatedAt": "2026-02-17T16:49:12.691Z",
       "detail": "Bron tijdelijk niet bereikbaar | fout: No generation mix values | tijdelijke bronstoring, laatste geldige waarde getoond | fout: No generation mix values | tijdelijke bronstoring, laatste geldige waarde getoond | fout: No generation mix values",
       "rows": []
     },
@@ -182,7 +181,7 @@
         },
         {
           "hour": "Duitsland",
-          "value": null,
+          "value": 0,
           "unit": "GWh/d"
         },
         {
@@ -237,11 +236,11 @@
     {
       "id": "nlCrossBorderFlows",
       "label": "Cross-Border Physical Flows NL (live, netto)",
-      "value": 5775.213634,
+      "value": 5919.6404999999995,
       "unit": "MW",
       "source": "ENTSO-E Transparency API",
       "sourceUrl": "https://web-api.tp.entsoe.eu/api",
-      "updatedAt": "2026-02-17T16:44:18.056Z",
+      "updatedAt": "2026-02-17T16:49:16.485Z",
       "detail": "Positief = netto import naar NL, negatief = netto export uit NL",
       "rows": [
         {
@@ -251,22 +250,22 @@
         },
         {
           "hour": "Duitsland",
-          "value": 1506.43868,
+          "value": 1656.9,
           "unit": "MW"
         },
         {
           "hour": "Verenigd Koninkrijk",
-          "value": -0.56,
+          "value": -0.41,
           "unit": "MW"
         },
         {
           "hour": "Denemarken",
-          "value": 660.32,
+          "value": 623.07,
           "unit": "MW"
         },
         {
           "hour": "Noorwegen",
-          "value": 618.024454,
+          "value": 649.09,
           "unit": "MW"
         }
       ]
@@ -278,17 +277,17 @@
       "unit": "%",
       "source": "NED API",
       "sourceUrl": "https://api.ned.nl/v1/utilizations",
-      "updatedAt": "2026-02-17T16:44:19.911Z",
-      "detail": "Bron tijdelijk niet bereikbaar | fout: HTTP 400 for https://api.ned.nl/v1/utilizations?point=0&granularity=4&granularitytimezone=0&validfrom%5Bafter%5D=2026-02-07&itemsPerPage=1200&type=28&activity=3"
+      "updatedAt": "2026-02-17T16:49:25.700Z",
+      "detail": "Bron tijdelijk niet bereikbaar | fout: No NED storage rows"
     },
     {
       "id": "nlElectricityOverview",
       "label": "Elektriciteit NL (actuele load)",
-      "value": 12709.452,
+      "value": 13192.832,
       "unit": "MW",
       "source": "ENTSO-E Transparency API",
       "sourceUrl": "https://web-api.tp.entsoe.eu/api",
-      "updatedAt": "2026-02-17T15:45:00.000Z",
+      "updatedAt": "2026-02-17T16:00:00.000Z",
       "detail": "Actuele load uit ENTSO-E",
       "rows": []
     },
@@ -299,7 +298,7 @@
       "unit": "Hz",
       "source": "mainsfrequency.com",
       "sourceUrl": "https://mainsfrequency.com/",
-      "updatedAt": "2026-02-17T16:44:21.014Z",
+      "updatedAt": "2026-02-17T16:49:27.360Z",
       "detail": "Doelwaarde rond 50 Hz"
     },
     {
@@ -309,19 +308,19 @@
       "unit": "GWh/d",
       "source": "NED API",
       "sourceUrl": "https://api.ned.nl/v1/utilizations",
-      "updatedAt": "2026-02-17T16:44:21.996Z",
-      "detail": "Bron tijdelijk niet bereikbaar | fout: HTTP 400 for https://api.ned.nl/v1/utilizations?point=0&granularity=4&granularitytimezone=0&validfrom%5Bafter%5D=2026-02-10&itemsPerPage=1200&type=55&activity=2",
+      "updatedAt": "2026-02-17T16:49:30.119Z",
+      "detail": "Bron tijdelijk niet bereikbaar | fout: No NED rows for Huishoudens & kleinzakelijk",
       "rows": []
     },
     {
       "id": "tennetRegulation",
       "label": "TenneT Balance Delta (actueel, 12s)",
-      "value": -60,
+      "value": -137,
       "unit": "MW",
       "source": "TenneT API (Balance Delta High Res)",
       "sourceUrl": "https://api.tennet.eu/publications/v1/balance-delta-high-res/latest",
-      "updatedAt": "2026-02-17T16:42:12Z",
-      "detail": "In 249.5 MW | Out 189.5 MW"
+      "updatedAt": "2026-02-17T16:47:24Z",
+      "detail": "In 162.5 MW | Out 25.5 MW"
     },
     {
       "id": "tennetSettlement",
@@ -330,8 +329,8 @@
       "unit": "EUR/MWh",
       "source": "TenneT API (fallback via Balance Delta)",
       "sourceUrl": "https://api.tennet.eu/publications/v1/balance-delta-high-res/latest",
-      "updatedAt": "2026-02-17T16:42:12Z",
-      "detail": "Fallback | Mid 62 | Up 112 | Down n/a"
+      "updatedAt": "2026-02-17T16:47:24Z",
+      "detail": "Fallback | Mid 62 | Up 109.7 | Down n/a"
     },
     {
       "id": "gaslichtElectricity",
@@ -340,8 +339,8 @@
       "unit": "EUR/kWh",
       "source": "Gaslicht",
       "sourceUrl": "https://www.gaslicht.com/stroom-vergelijken/resultaten?showonlyswitchable=False&contracttype=Vast&stroomhoogverbruik=1000&stroomlaagverbruik=1000",
-      "updatedAt": "2026-02-17T16:44:06.009Z",
-      "detail": "Deze scraper is nog niet omgezet naar JavaScript backend"
+      "updatedAt": "2026-02-17T16:49:33.983Z",
+      "detail": "Bron tijdelijk niet bereikbaar | fout: Could not parse Gaslicht cheapest price"
     },
     {
       "id": "gaslichtGas",
@@ -350,8 +349,8 @@
       "unit": "EUR/m3",
       "source": "Gaslicht",
       "sourceUrl": "https://www.gaslicht.com/gas-vergelijken/resultaten?showonlyswitchable=False&contracttype=Vast&gasverbruik=1000",
-      "updatedAt": "2026-02-17T16:44:06.009Z",
-      "detail": "Deze scraper is nog niet omgezet naar JavaScript backend"
+      "updatedAt": "2026-02-17T16:49:34.946Z",
+      "detail": "Bron tijdelijk niet bereikbaar | fout: Could not parse Gaslicht cheapest price"
     },
     {
       "id": "gaslichtLongestContract",
@@ -360,7 +359,7 @@
       "unit": "jaar",
       "source": "Gaslicht",
       "sourceUrl": "https://www.gaslicht.com/energievergelijken/",
-      "updatedAt": "2026-02-17T16:44:06.009Z",
+      "updatedAt": "2026-02-17T16:49:10.678Z",
       "detail": "Deze scraper is nog niet omgezet naar JavaScript backend"
     },
     {
@@ -370,26 +369,30 @@
       "unit": "jaar",
       "source": "Gaslicht",
       "sourceUrl": "https://www.gaslicht.com/stroom-vergelijken/resultaten?showonlyswitchable=False&contracttype=Vast&stroomhoogverbruik=1000&stroomlaagverbruik=1000",
-      "updatedAt": "2026-02-17T16:44:06.009Z",
+      "updatedAt": "2026-02-17T16:49:10.678Z",
       "detail": "Deze scraper is nog niet omgezet naar JavaScript backend"
     }
   ],
   "errors": [
-    {
-      "source": "getTTFGas",
-      "error": "HTTP 404 for https://markets.businessinsider.com/commodities/dutch-ttf-gas"
-    },
     {
       "source": "getEntsoeGenerationMixShare",
       "error": "No generation mix values"
     },
     {
       "source": "getNlGasStorage",
-      "error": "HTTP 400 for https://api.ned.nl/v1/utilizations?point=0&granularity=4&granularitytimezone=0&validfrom%5Bafter%5D=2026-02-07&itemsPerPage=1200&type=28&activity=3"
+      "error": "No NED storage rows"
     },
     {
       "source": "getNlGasConsumptionBreakdown",
-      "error": "HTTP 400 for https://api.ned.nl/v1/utilizations?point=0&granularity=4&granularitytimezone=0&validfrom%5Bafter%5D=2026-02-10&itemsPerPage=1200&type=55&activity=2"
+      "error": "No NED rows for Huishoudens & kleinzakelijk"
+    },
+    {
+      "source": "",
+      "error": "Could not parse Gaslicht cheapest price"
+    },
+    {
+      "source": "",
+      "error": "Could not parse Gaslicht cheapest price"
     }
   ],
   "note": "Data is fetched from public APIs/sources and may lag or change format."
