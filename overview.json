@@ -1,0 +1,96 @@
+{
+  "generatedAt": "2026-02-16T00:00:00.000Z",
+  "durationMs": 0,
+  "items": [
+    {
+      "id": "nlElectricityOverview",
+      "label": "Elektriciteit NL (actuele load)",
+      "value": null,
+      "unit": "MW",
+      "source": "Auto updater",
+      "sourceUrl": "https://github.com",
+      "updatedAt": "2026-02-16T00:00:00.000Z",
+      "detail": "Nog geen dataset gegenereerd. Draai de GitHub Action 'Update overview.json'.",
+      "rows": []
+    },
+    {
+      "id": "dayAheadPower24h",
+      "label": "EPEX SPOT Day-Ahead NL (24h vooruit)",
+      "value": null,
+      "unit": "EUR/MWh",
+      "source": "Auto updater",
+      "sourceUrl": "https://github.com",
+      "updatedAt": "2026-02-16T00:00:00.000Z",
+      "detail": "Nog geen dataset gegenereerd.",
+      "rows": []
+    },
+    {
+      "id": "ttfGas",
+      "label": "TTF Gas",
+      "value": null,
+      "unit": "EUR/MWh",
+      "source": "Auto updater",
+      "sourceUrl": "https://github.com",
+      "updatedAt": "2026-02-16T00:00:00.000Z",
+      "detail": "Nog geen dataset gegenereerd."
+    },
+    {
+      "id": "nlGasStorage",
+      "label": "NL Gasopslag (actueel)",
+      "value": null,
+      "unit": "%",
+      "source": "Auto updater",
+      "sourceUrl": "https://github.com",
+      "updatedAt": "2026-02-16T00:00:00.000Z",
+      "detail": "Nog geen dataset gegenereerd.",
+      "rows": []
+    },
+    {
+      "id": "gaslichtElectricity",
+      "label": "Cheapest Electricity Provider (Gaslicht)",
+      "value": null,
+      "unit": "EUR/kWh",
+      "source": "Gaslicht",
+      "sourceUrl": "https://www.gaslicht.com/stroom-vergelijken/resultaten?showonlyswitchable=False&contracttype=Vast&stroomhoogverbruik=1000&stroomlaagverbruik=1000",
+      "updatedAt": "2026-02-16T00:00:00.000Z",
+      "detail": "Placeholder tot eerste update"
+    },
+    {
+      "id": "gaslichtGas",
+      "label": "Cheapest Gas Provider (Gaslicht)",
+      "value": null,
+      "unit": "EUR/m3",
+      "source": "Gaslicht",
+      "sourceUrl": "https://www.gaslicht.com/gas-vergelijken/resultaten?showonlyswitchable=False&contracttype=Vast&gasverbruik=1000",
+      "updatedAt": "2026-02-16T00:00:00.000Z",
+      "detail": "Placeholder tot eerste update"
+    },
+    {
+      "id": "gaslichtLongestContract",
+      "label": "Langste Contractduur (Gaslicht)",
+      "value": null,
+      "unit": "jaar",
+      "source": "Gaslicht",
+      "sourceUrl": "https://www.gaslicht.com/energievergelijken/",
+      "updatedAt": "2026-02-16T00:00:00.000Z",
+      "detail": "Placeholder tot eerste update"
+    },
+    {
+      "id": "gaslichtLongestContractElectricity",
+      "label": "Langste Contractduur Stroom",
+      "value": null,
+      "unit": "jaar",
+      "source": "Gaslicht",
+      "sourceUrl": "https://www.gaslicht.com/stroom-vergelijken/resultaten?showonlyswitchable=False&contracttype=Vast&stroomhoogverbruik=1000&stroomlaagverbruik=1000",
+      "updatedAt": "2026-02-16T00:00:00.000Z",
+      "detail": "Placeholder tot eerste update"
+    }
+  ],
+  "errors": [
+    {
+      "source": "bootstrap",
+      "error": "Nog geen live update gedraaid"
+    }
+  ],
+  "note": "Startbestand voor statische hosting."
+}
