@@ -1,0 +1,13 @@
+{
+  "name": "energy-market-overview",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Python-free energy dashboard server",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "update:overview": "node server.js --generate-static"
+  }
+}
