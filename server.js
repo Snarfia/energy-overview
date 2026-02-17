@@ -51,15 +51,22 @@ function query(params) {
 }
 
 async function fetchText(url, extraHeaders = {}, timeoutMs = 15000) {
-  const ctrl = new AbortController();
-  const t = setTimeout(() => ctrl.abort(), timeoutMs);
-  try {
-    const res = await fetch(url, { headers: { ...COMMON_HEADERS, ...extraHeaders }, signal: ctrl.signal, cache: 'no-store' });
-    if (!res.ok) throw new Error(`HTTP ${res.status} for ${url}`);
-    return await res.text();
-  } finally {
-    clearTimeout(t);
+  let lastErr = null;
+  for (let attempt = 1; attempt <= 2; attempt += 1) {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), timeoutMs);
+    try {
+      const res = await fetch(url, { headers: { ...COMMON_HEADERS, ...extraHeaders }, signal: ctrl.signal, cache: 'no-store' });
+      if (!res.ok) throw new Error(`HTTP ${res.status} for ${url}`);
+      return await res.text();
+    } catch (err) {
+      lastErr = err;
+      if (attempt < 2) await new Promise((resolve) => setTimeout(resolve, 600));
+    } finally {
+      clearTimeout(t);
+    }
   }
+  throw lastErr || new Error(`Failed to fetch ${url}`);
 }
 
 async function fetchJson(url, extraHeaders = {}, timeoutMs = 15000) {
@@ -131,6 +138,39 @@ function fallbackItem(base, err) {
   const next = { ...base };
   const msg = err ? `fout: ${String(err.message || err)}` : 'bron tijdelijk niet bereikbaar';
   next.detail = base.detail ? `${base.detail} | ${msg}` : msg;
+  next.updatedAt = new Date().toISOString();
+  return next;
+}
+
+function loadPreviousOverviewMap() {
+  try {
+    const overviewPath = path.join(STATIC_DIR, 'overview.json');
+    if (!fs.existsSync(overviewPath)) return new Map();
+    const raw = fs.readFileSync(overviewPath, 'utf8');
+    const payload = JSON.parse(raw);
+    const rows = Array.isArray(payload?.items) ? payload.items : [];
+    const out = new Map();
+    for (const item of rows) {
+      if (item && typeof item === 'object' && item.id) out.set(String(item.id), item);
+    }
+    return out;
+  } catch {
+    return new Map();
+  }
+}
+
+function hasUsefulValue(item) {
+  if (!item || typeof item !== 'object') return false;
+  if (item.value !== null && item.value !== undefined) return true;
+  if (typeof item.valueText === 'string' && item.valueText.trim()) return true;
+  if (Array.isArray(item.rows) && item.rows.some((r) => (r?.value !== null && r?.value !== undefined) || (typeof r?.valueText === 'string' && r.valueText.trim()))) return true;
+  return false;
+}
+
+function cachedItemWithError(cachedItem, err) {
+  const next = { ...cachedItem };
+  const msg = err ? `tijdelijke bronstoring, laatste geldige waarde getoond | fout: ${String(err.message || err)}` : 'tijdelijke bronstoring, laatste geldige waarde getoond';
+  next.detail = next.detail ? `${next.detail} | ${msg}` : msg;
   next.updatedAt = new Date().toISOString();
   return next;
 }
@@ -703,6 +743,7 @@ async function collectOverview() {
   const started = Date.now();
   const items = [];
   const errors = [];
+  const previousById = loadPreviousOverviewMap();
 
   const fallbackRows24 = Array.from({ length: 24 }, (_, i) => {
     const d = new Date(Date.now() + i * 3600_000);
@@ -711,7 +752,7 @@ async function collectOverview() {
 
   const tasks = [
     [getDayAheadPower24h, { id: 'dayAheadPower24h', label: 'EPEX SPOT Day-Ahead NL (24h vooruit)', value: null, unit: 'EUR/MWh', source: 'ENTSO-E Transparency API (EPEX SPOT NL)', sourceUrl: ENTSOE_BASE, updatedAt: new Date().toISOString(), detail: 'Bron tijdelijk niet bereikbaar', rows: fallbackRows24 }],
-    [getTTFGas, null],
+    [getTTFGas, { id: 'ttfGas', label: 'TTF Gas', value: null, unit: 'EUR/MWh', source: 'TradingEconomics', sourceUrl: 'https://tradingeconomics.com/commodity/eu-natural-gas', updatedAt: new Date().toISOString(), detail: 'Bron tijdelijk niet bereikbaar' }],
     [getETSPrice, { id: 'ets', label: 'EU ETS (ICE EUA Futures)', value: null, unit: 'EUR/tCO2', source: 'Barchart', sourceUrl: 'https://www.barchart.com/futures/quotes/CKJ26', updatedAt: new Date().toISOString(), detail: 'Bron tijdelijk niet bereikbaar' }],
     [getEntsoeGenerationMixShare, { id: 'nlGenerationMixShare', label: 'Opwek Mix NL (actuele verhouding)', value: null, unit: '', valueText: 'Verhouding per bron', source: 'ENTSO-E Transparency API', sourceUrl: ENTSOE_BASE, updatedAt: new Date().toISOString(), detail: 'Bron tijdelijk niet bereikbaar', rows: [] }],
     [getNlGasImport, { id: 'nlGasImport', label: 'Gas Cross-Border Flows NL (per land, netto)', value: null, unit: 'GWh/d', source: 'ENTSOG API', sourceUrl: ENTSOG_BASE, updatedAt: new Date().toISOString(), detail: 'Bron tijdelijk niet bereikbaar', rows: [{ hour: 'Belgie', value: null, unit: 'GWh/d' }, { hour: 'Duitsland', value: null, unit: 'GWh/d' }, { hour: 'Verenigd Koninkrijk', value: null, unit: 'GWh/d' }, { hour: 'Denemarken', value: null, unit: 'GWh/d' }, { hour: 'Noorwegen', value: null, unit: 'GWh/d' }, { hour: 'LNG (Gate+EET)', value: null, unit: 'GWh/d' }, { hour: 'Gasopslag (4 sites)', value: null, unit: 'GWh/d' }] }],
@@ -738,7 +779,13 @@ async function collectOverview() {
       items.push(await fn());
     } catch (err) {
       errors.push({ source: fn.name, error: String(err.message || err) });
-      if (fb) items.push(fallbackItem(fb, err));
+      const fbId = fb?.id ? String(fb.id) : null;
+      const previous = fbId ? previousById.get(fbId) : null;
+      if (previous && hasUsefulValue(previous)) {
+        items.push(cachedItemWithError(previous, err));
+      } else if (fb) {
+        items.push(fallbackItem(fb, err));
+      }
     }
   }
   items.push(...staticFallbacks);
