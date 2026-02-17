@@ -1,22 +1,17 @@
 {
-  "generatedAt": "2026-02-17T16:57:07.817Z",
-  "durationMs": 46332,
+  "generatedAt": "2026-02-17T17:03:47.257Z",
+  "durationMs": 69893,
   "items": [
     {
       "id": "dayAheadPower24h",
       "label": "EPEX SPOT Day-Ahead NL (24h vooruit)",
-      "value": 120.14,
+      "value": 134.14,
       "unit": "EUR/MWh",
       "source": "ENTSO-E Transparency API (EPEX SPOT NL)",
       "sourceUrl": "https://web-api.tp.entsoe.eu/api",
-      "updatedAt": "2026-02-17T16:56:22.531Z",
+      "updatedAt": "2026-02-17T17:02:38.385Z",
       "detail": "Komende 24 uur per uur",
       "rows": [
-        {
-          "hour": "16:00",
-          "value": 120.14,
-          "unit": "EUR/MWh"
-        },
         {
           "hour": "17:00",
           "value": 134.14,
@@ -131,6 +126,11 @@
           "hour": "15:00",
           "value": 116,
           "unit": "EUR/MWh"
+        },
+        {
+          "hour": "16:00",
+          "value": 128.82,
+          "unit": "EUR/MWh"
         }
       ]
     },
@@ -141,7 +141,8 @@
       "unit": "EUR/MWh",
       "source": "TradingEconomics",
       "sourceUrl": "https://tradingeconomics.com/commodity/eu-natural-gas",
-      "updatedAt": "2026-02-17T16:56:22.697Z"
+      "updatedAt": "2026-02-17T17:02:40.851Z",
+      "detail": "tijdelijke bronstoring, laatste geldige waarde getoond | fout: HTTP 404 for https://markets.businessinsider.com/commodities/dutch-ttf-gas"
     },
     {
       "id": "ets",
@@ -160,28 +161,28 @@
       "valueText": "Verhouding per bron",
       "source": "ENTSO-E Transparency API",
       "sourceUrl": "https://web-api.tp.entsoe.eu/api",
-      "updatedAt": "2026-02-17T16:56:45.804Z",
+      "updatedAt": "2026-02-17T17:03:04.047Z",
       "detail": "Bron tijdelijk niet bereikbaar | fout: No generation mix values | tijdelijke bronstoring, laatste geldige waarde getoond | fout: No generation mix values | tijdelijke bronstoring, laatste geldige waarde getoond | fout: No generation mix values",
       "rows": []
     },
     {
       "id": "nlGasImport",
       "label": "Gas Cross-Border Flows NL (per land, netto)",
-      "value": 0,
+      "value": -39.85759299999995,
       "unit": "GWh/d",
       "source": "ENTSOG API",
       "sourceUrl": "https://transparency.entsog.eu/api/v1/operationaldatas?operatorKey=NL-TSO-0001&indicator=Physical+Flow&from=2026-02-13&to=2026-02-17&limit=6000",
-      "updatedAt": "2026-02-17T04:00:00.000Z",
+      "updatedAt": "2026-02-16T05:00:00.000Z",
       "detail": "Positief = netto import naar NL, negatief = netto export uit NL",
       "rows": [
         {
           "hour": "Belgie",
-          "value": null,
+          "value": 325.432912,
           "unit": "GWh/d"
         },
         {
           "hour": "Duitsland",
-          "value": 0,
+          "value": -1841.186833,
           "unit": "GWh/d"
         },
         {
@@ -196,17 +197,17 @@
         },
         {
           "hour": "Noorwegen",
-          "value": null,
+          "value": 165.045834,
           "unit": "GWh/d"
         },
         {
           "hour": "LNG (Gate+EET)",
-          "value": 0,
+          "value": 521.166865,
           "unit": "GWh/d"
         },
         {
           "hour": "Gasopslag (4 sites)",
-          "value": 0,
+          "value": 789.683629,
           "unit": "GWh/d"
         }
       ]
@@ -236,11 +237,11 @@
     {
       "id": "nlCrossBorderFlows",
       "label": "Cross-Border Physical Flows NL (live, netto)",
-      "value": 5548.655239,
+      "value": 6315.7805,
       "unit": "MW",
       "source": "ENTSO-E Transparency API",
       "sourceUrl": "https://web-api.tp.entsoe.eu/api",
-      "updatedAt": "2026-02-17T16:56:50.143Z",
+      "updatedAt": "2026-02-17T17:03:22.637Z",
       "detail": "Positief = netto import naar NL, negatief = netto export uit NL",
       "rows": [
         {
@@ -250,7 +251,7 @@
         },
         {
           "hour": "Duitsland",
-          "value": 1613.36933,
+          "value": 2374.29,
           "unit": "MW"
         },
         {
@@ -260,12 +261,12 @@
         },
         {
           "hour": "Denemarken",
-          "value": 338.29,
+          "value": 328.19,
           "unit": "MW"
         },
         {
           "hour": "Noorwegen",
-          "value": 606.415409,
+          "value": 622.72,
           "unit": "MW"
         }
       ]
@@ -275,19 +276,27 @@
       "label": "NL Gasopslag (actueel)",
       "value": null,
       "unit": "%",
-      "source": "NED API",
-      "sourceUrl": "https://api.ned.nl/v1/utilizations",
-      "updatedAt": "2026-02-17T16:56:59.414Z",
-      "detail": "Bron tijdelijk niet bereikbaar | fout: No NED storage rows"
+      "valueText": "Leegt (uit opslag naar net)",
+      "source": "ENTSOG API (fallback)",
+      "sourceUrl": "https://transparency.entsog.eu/api/v1/operationaldatas?operatorKey=NL-TSO-0001&indicator=Physical+Flow&from=2026-02-13&to=2026-02-17&limit=6000",
+      "updatedAt": "2026-02-16T05:00:00.000Z",
+      "detail": "NED tijdelijk niet beschikbaar; opslagstatus op basis van ENTSOG dagstroom",
+      "rows": [
+        {
+          "hour": "Gasopslag nettoflow",
+          "value": 789.683629,
+          "unit": "GWh/d"
+        }
+      ]
     },
     {
       "id": "nlElectricityOverview",
       "label": "Elektriciteit NL (actuele load)",
-      "value": 13192.832,
+      "value": 13400.309,
       "unit": "MW",
       "source": "ENTSO-E Transparency API",
       "sourceUrl": "https://web-api.tp.entsoe.eu/api",
-      "updatedAt": "2026-02-17T16:00:00.000Z",
+      "updatedAt": "2026-02-17T16:15:00.000Z",
       "detail": "Actuele load uit ENTSO-E",
       "rows": []
     },
@@ -298,29 +307,45 @@
       "unit": "Hz",
       "source": "mainsfrequency.com",
       "sourceUrl": "https://mainsfrequency.com/",
-      "updatedAt": "2026-02-17T16:57:00.730Z",
+      "updatedAt": "2026-02-17T17:03:38.200Z",
       "detail": "Doelwaarde rond 50 Hz"
     },
     {
       "id": "nlGasConsumptionBreakdown",
       "label": "Gasconsumptie NL (laatste volledige dag)",
-      "value": null,
+      "value": 1443.017341,
       "unit": "GWh/d",
-      "source": "NED API",
-      "sourceUrl": "https://api.ned.nl/v1/utilizations",
-      "updatedAt": "2026-02-17T16:57:03.410Z",
-      "detail": "Bron tijdelijk niet bereikbaar | fout: No NED rows for Huishoudens & kleinzakelijk",
-      "rows": []
+      "source": "ENTSOG API (fallback)",
+      "sourceUrl": "https://transparency.entsog.eu/api/v1/operationaldatas?operatorKey=NL-TSO-0001&indicator=Allocation&from=2026-02-11&to=2026-02-17&limit=6000",
+      "updatedAt": "2026-02-16T05:00:00.000Z",
+      "detail": "NED tijdelijk niet beschikbaar; onderverdeling op ENTSOG exit-categorieen",
+      "rows": [
+        {
+          "hour": "Huishoudens & kleinzakelijk",
+          "value": 0,
+          "unit": "%"
+        },
+        {
+          "hour": "Industrie",
+          "value": 85.02637370592763,
+          "unit": "%"
+        },
+        {
+          "hour": "Gascentrales",
+          "value": 14.973626294072373,
+          "unit": "%"
+        }
+      ]
     },
     {
       "id": "tennetRegulation",
       "label": "TenneT Balance Delta (actueel, 12s)",
-      "value": -181,
+      "value": 142,
       "unit": "MW",
       "source": "TenneT API (Balance Delta High Res)",
       "sourceUrl": "https://api.tennet.eu/publications/v1/balance-delta-high-res/latest",
-      "updatedAt": "2026-02-17T16:55:00Z",
-      "detail": "In 197.1 MW | Out 16.1 MW"
+      "updatedAt": "2026-02-17T17:01:36Z",
+      "detail": "In 7.0 MW | Out 149.0 MW"
     },
     {
       "id": "tennetSettlement",
@@ -329,8 +354,8 @@
       "unit": "EUR/MWh",
       "source": "TenneT API (fallback via Balance Delta)",
       "sourceUrl": "https://api.tennet.eu/publications/v1/balance-delta-high-res/latest",
-      "updatedAt": "2026-02-17T16:55:00Z",
-      "detail": "Fallback | Mid 62 | Up 109.7 | Down n/a"
+      "updatedAt": "2026-02-17T17:01:36Z",
+      "detail": "Fallback | Mid 62 | Up n/a | Down 78.38"
     },
     {
       "id": "gaslichtElectricity",
@@ -339,7 +364,7 @@
       "unit": "EUR/kWh",
       "source": "Gaslicht",
       "sourceUrl": "https://www.gaslicht.com/stroom-vergelijken/resultaten?showonlyswitchable=False&contracttype=Vast&stroomhoogverbruik=1000&stroomlaagverbruik=1000",
-      "updatedAt": "2026-02-17T16:57:06.782Z",
+      "updatedAt": "2026-02-17T17:03:46.074Z",
       "detail": "Bron tijdelijk niet bereikbaar | fout: Could not parse Gaslicht cheapest price"
     },
     {
@@ -349,7 +374,7 @@
       "unit": "EUR/m3",
       "source": "Gaslicht",
       "sourceUrl": "https://www.gaslicht.com/gas-vergelijken/resultaten?showonlyswitchable=False&contracttype=Vast&gasverbruik=1000",
-      "updatedAt": "2026-02-17T16:57:07.816Z",
+      "updatedAt": "2026-02-17T17:03:47.256Z",
       "detail": "Bron tijdelijk niet bereikbaar | fout: Could not parse Gaslicht cheapest price"
     },
     {
@@ -359,7 +384,7 @@
       "unit": "jaar",
       "source": "Gaslicht",
       "sourceUrl": "https://www.gaslicht.com/energievergelijken/",
-      "updatedAt": "2026-02-17T16:56:21.485Z",
+      "updatedAt": "2026-02-17T17:02:37.364Z",
       "detail": "Deze scraper is nog niet omgezet naar JavaScript backend"
     },
     {
@@ -369,22 +394,18 @@
       "unit": "jaar",
       "source": "Gaslicht",
       "sourceUrl": "https://www.gaslicht.com/stroom-vergelijken/resultaten?showonlyswitchable=False&contracttype=Vast&stroomhoogverbruik=1000&stroomlaagverbruik=1000",
-      "updatedAt": "2026-02-17T16:56:21.485Z",
+      "updatedAt": "2026-02-17T17:02:37.364Z",
       "detail": "Deze scraper is nog niet omgezet naar JavaScript backend"
     }
   ],
   "errors": [
     {
+      "source": "getTTFGas",
+      "error": "HTTP 404 for https://markets.businessinsider.com/commodities/dutch-ttf-gas"
+    },
+    {
       "source": "getGenerationMixShare",
       "error": "No NED generation mix values"
-    },
-    {
-      "source": "getNlGasStorage",
-      "error": "No NED storage rows"
-    },
-    {
-      "source": "getNlGasConsumptionBreakdown",
-      "error": "No NED rows for Huishoudens & kleinzakelijk"
     },
     {
       "source": "",
