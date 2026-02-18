@@ -1340,7 +1340,7 @@ async function getGaslichtCheapest(kind) {
   const unit = isGas ? 'EUR/m3' : 'EUR/kWh';
   const targetUnit = isGas ? 'm3' : 'kwh';
 
-  // Preferred path: parse Gaslicht product payloads for commodity rates only.
+  // Step 1: parse product payloads and pick the cheapest contract by total contract costs.
   const products = [];
   const productRe = /data-product=(?:"([^"]+)"|'([^']+)')/gi;
   let pm;
@@ -1354,97 +1354,114 @@ async function getGaslichtCheapest(kind) {
     }
   }
 
-  const impressions = [];
-  const impRe = /data-js-gtminfo="([^"]*Impressions[^"]*)"/gi;
-  let im;
-  while ((im = impRe.exec(html))) {
-    const raw = htmlDecode(im[1] || '');
-    try {
-      const parsed = JSON.parse(raw);
-      const arr = parsed?.Ecommerce?.Impressions || [];
-      if (Array.isArray(arr)) impressions.push(...arr);
-    } catch {
-      // skip invalid payload
+  const totalCostOf = (p) => {
+    const totalKeys = ['PackageCosts', 'Price', 'PackageCost', 'TotalPrice', 'MonthlyCosts'];
+    const bonusKeys = ['WelcomeBonus', 'welcomeBonus', 'Bonus'];
+    let total = null;
+    for (const k of totalKeys) {
+      const n = toNumber(p?.[k]);
+      if (n !== null) {
+        total = n;
+        break;
+      }
+    }
+    if (total === null) return null;
+    let bonus = 0;
+    for (const k of bonusKeys) {
+      const n = toNumber(p?.[k]);
+      if (n !== null) {
+        bonus = n;
+        break;
+      }
+    }
+    return total + bonus;
+  };
+
+  let cheapestProduct = null;
+  let cheapestCost = null;
+  for (const p of products) {
+    const c = totalCostOf(p);
+    if (c === null) continue;
+    if (cheapestProduct === null || c < cheapestCost) {
+      cheapestProduct = p;
+      cheapestCost = c;
     }
   }
+  if (!cheapestProduct) throw new Error('Could not determine cheapest Gaslicht contract by total costs');
 
-  function* walk(obj) {
-    if (Array.isArray(obj)) {
-      for (const item of obj) yield* walk(item);
-      return;
-    }
-    if (!obj || typeof obj !== 'object') return;
-    for (const [k, v] of Object.entries(obj)) {
-      yield [k, v, obj];
-      if (v && typeof v === 'object') yield* walk(v);
-    }
-  }
+  const pkgPath = String(cheapestProduct?.PackageUrl || '');
+  const detailUrl = pkgPath.startsWith('/') ? `https://www.gaslicht.com${pkgPath}` : sourceUrl;
 
-  function normalizeCommodityPrice(rawNum, unitHint, keyHint = '', textHint = '') {
-    let n = toNumber(rawNum);
+  // Step 2: parse commodity unit-price (incl taxes) from contract detail page.
+  const detailHtml = await fetchText(detailUrl, {}, 15000);
+
+  const normalizeCommodity = (raw, unitHint, context = '') => {
+    let n = toNumber(raw);
     if (n === null || n <= 0) return null;
-    const u = String(unitHint || '').toLowerCase();
-    const k = String(keyHint || '').toLowerCase();
-    const t = String(textHint || '').toLowerCase();
-    const blob = `${u} ${k} ${t}`;
-    const hasTargetUnit = targetUnit === 'm3' ? (blob.includes('m3') || blob.includes('m³')) : blob.includes('kwh');
-    if (!hasTargetUnit) return null;
-    if (blob.includes('teruglever') || blob.includes('feed') || blob.includes('invoed')) return null;
-    if (blob.includes('vastrecht') || blob.includes('abon')) return null;
-    if (n > 10) n = n / 100; // cents to euros fallback
+    const ctx = `${String(unitHint || '').toLowerCase()} ${String(context || '').toLowerCase()}`;
+    const hasUnit = targetUnit === 'm3' ? (ctx.includes('m3') || ctx.includes('m³')) : ctx.includes('kwh');
+    if (!hasUnit) return null;
+    if (ctx.includes('teruglever') || ctx.includes('feed') || ctx.includes('invoed')) return null;
+    if (ctx.includes('vastrecht') || ctx.includes('abon')) return null;
+    if (n > 10) n = n / 100;
     if (targetUnit === 'm3') return n >= 0.2 && n <= 5 ? n : null;
     return n >= 0.03 && n <= 2 ? n : null;
+  };
+
+  const unitPatterns = targetUnit === 'm3'
+    ? [
+        /([0-9]+(?:[.,][0-9]+)?)\s*(ct|cent|eur|€)?\s*\/\s*(m3|m³)/ig,
+        /(m3|m³)[^0-9]{0,28}([0-9]+(?:[.,][0-9]+)?)/ig,
+      ]
+    : [
+        /([0-9]+(?:[.,][0-9]+)?)\s*(ct|cent|eur|€)?\s*\/\s*(kwh)/ig,
+        /(kwh)[^0-9]{0,28}([0-9]+(?:[.,][0-9]+)?)/ig,
+      ];
+
+  const prices = [];
+  for (const re of unitPatterns) {
+    let m;
+    while ((m = re.exec(detailHtml))) {
+      const tokenA = m[1];
+      const tokenB = m[2];
+      const tokenC = m[3];
+      const num = tokenB && (String(tokenA).toLowerCase() === targetUnit || String(tokenA).toLowerCase() === 'm³') ? tokenB : tokenA;
+      const unitHint = tokenC || tokenA || targetUnit;
+      const ctx = detailHtml.slice(Math.max(0, m.index - 80), Math.min(detailHtml.length, m.index + 180));
+      const n = normalizeCommodity(num, unitHint, ctx);
+      if (n !== null) prices.push({ value: n, ctx: ctx.toLowerCase() });
+    }
   }
 
-  const candidates = [];
-  for (const p of products) {
-    for (const [k, v, parent] of walk(p)) {
-      if (typeof v === 'number' || typeof v === 'string') {
-        const parentText = Object.values(parent || {}).filter((x) => typeof x === 'string').join(' ');
-        const c = normalizeCommodityPrice(v, k, k, parentText);
-        if (c !== null) candidates.push({ value: c, src: p });
+  if (!prices.length) {
+    // fallback: parse same commodity unit from product payload of selected contract
+    const payloadText = JSON.stringify(cheapestProduct);
+    for (const re of unitPatterns) {
+      let m;
+      while ((m = re.exec(payloadText))) {
+        const num = m[2] && (String(m[1]).toLowerCase() === targetUnit || String(m[1]).toLowerCase() === 'm³') ? m[2] : m[1];
+        const unitHint = m[3] || m[1] || targetUnit;
+        const n = normalizeCommodity(num, unitHint, payloadText);
+        if (n !== null) prices.push({ value: n, ctx: payloadText.toLowerCase() });
       }
     }
   }
 
-  // Regex fallback on HTML around explicit unit prices in price details.
-  const htmlPatterns = targetUnit === 'm3'
-    ? [
-        /([0-9]+(?:[.,][0-9]+)?)\s*(ct|cent|eur|€)?\s*\/\s*(m3|m³)/ig,
-        /(m3|m³)[^0-9]{0,24}([0-9]+(?:[.,][0-9]+)?)/ig,
-      ]
-    : [
-        /([0-9]+(?:[.,][0-9]+)?)\s*(ct|cent|eur|€)?\s*\/\s*(kwh)/ig,
-        /(kwh)[^0-9]{0,24}([0-9]+(?:[.,][0-9]+)?)/ig,
-      ];
-  for (const re of htmlPatterns) {
-    let m;
-    while ((m = re.exec(html))) {
-      const num = m[2] && (m[1].toLowerCase() === targetUnit || m[1].toLowerCase() === 'm³') ? m[2] : m[1];
-      const unitHint = m[3] || m[1] || targetUnit;
-      const ctx = html.slice(Math.max(0, m.index - 40), Math.min(html.length, m.index + 120));
-      const c = normalizeCommodityPrice(num, unitHint, '', ctx);
-      if (c !== null) candidates.push({ value: c, src: null });
-    }
-  }
+  if (!prices.length) throw new Error('Could not parse commodity unit price from cheapest contract details');
 
-  if (candidates.length) {
-    const min = candidates.sort((a, b) => a.value - b.value)[0];
-    const pkg = String(min?.src?.PackageUrl || '');
-    const src = pkg.startsWith('/') ? `https://www.gaslicht.com${pkg}` : sourceUrl;
-    return {
-      id: isGas ? 'gaslichtGas' : 'gaslichtElectricity',
-      label: isGas ? 'Cheapest Gas Provider (Gaslicht)' : 'Cheapest Electricity Provider (Gaslicht)',
-      value: min.value,
-      unit,
-      source: 'Gaslicht',
-      sourceUrl: src,
-      updatedAt: new Date().toISOString(),
-      detail: 'Laagste commodity-prijs uit prijsdetails (per eenheid)',
-    };
-  }
+  const inclFirst = prices.filter((p) => p.ctx.includes('incl') || p.ctx.includes('inclusief') || p.ctx.includes('belasting') || p.ctx.includes('all-in'));
+  const chosen = (inclFirst.length ? inclFirst : prices).sort((a, b) => a.value - b.value)[0];
 
-  throw new Error('Could not parse Gaslicht commodity unit price');
+  return {
+    id: isGas ? 'gaslichtGas' : 'gaslichtElectricity',
+    label: isGas ? 'Cheapest Gas Provider (Gaslicht)' : 'Cheapest Electricity Provider (Gaslicht)',
+    value: chosen.value,
+    unit,
+    source: 'Gaslicht',
+    sourceUrl: detailUrl,
+    updatedAt: new Date().toISOString(),
+    detail: 'Goedkoopste contract op totale kosten; commodity-prijs uit contractdetails (incl belastingen indien beschikbaar)',
+  };
 }
 
 async function getGaslichtCheapestElectricity() {
