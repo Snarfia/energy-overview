@@ -176,16 +176,17 @@ function createCrossBorderFlowMap(rows, unitLabel = "MW", mode = "electricity") 
   svg.setAttribute("class", "flow-map");
 
   const isGas = mode === "gas";
-  const NL = isGas ? { x: 500, y: 230, label: "NL" } : { x: 505, y: 220, label: "NL" };
+  const NL = isGas ? { x: 500, y: 220, label: "NL" } : { x: 505, y: 220, label: "NL" };
   const anchors = isGas
     ? {
-        "Verenigd Koninkrijk": { x: 200, y: 230, label: "GB" },
-        Belgie: { x: 380, y: 300, label: "BE" },
-        Duitsland: { x: 760, y: 230, label: "DE" },
-        Denemarken: { x: 760, y: 110, label: "DK" },
-        Noorwegen: { x: 560, y: 46, label: "NO" },
-        "LNG (Gate+EET)": { x: 450, y: 120, label: "LNG" },
-        "Gasopslag (4 sites)": { x: 500, y: 355, label: "OPS" },
+        "Verenigd Koninkrijk": { x: 180, y: 220, label: "GB" },
+        Belgie: { x: 320, y: 335, label: "BE" },
+        Duitsland: { x: 820, y: 220, label: "DE" },
+        Denemarken: { x: 770, y: 88, label: "DK" },
+        Noorwegen: { x: 620, y: 40, label: "NO" },
+        "LNG (Gate+EET)": { x: 420, y: 100, label: "LNG" },
+        "Gasopslag (4 sites)": { x: 500, y: 340, label: "OPS" },
+        "Nationale productie": { x: 620, y: 320, label: "PROD" },
       }
     : {
         "Verenigd Koninkrijk": { x: 260, y: 220, label: "GB" },
@@ -194,6 +195,110 @@ function createCrossBorderFlowMap(rows, unitLabel = "MW", mode = "electricity") 
         Denemarken: { x: 625, y: 130, label: "DK" },
         Noorwegen: { x: 535, y: 70, label: "NO" },
       };
+
+  if (isGas) {
+    const rowByName = new Map((rows || []).map((r) => [String(r.hour || ""), r]));
+    const maxAbs = Math.max(
+      1,
+      ...(rows || [])
+        .map((r) => Number(r.value))
+        .filter((v) => Number.isFinite(v))
+        .map((v) => Math.abs(v))
+    );
+    const ribbonPath = (x1, y1, x2, y2, w) => {
+      const dx = x2 - x1;
+      const dy = y2 - y1;
+      const len = Math.max(1, Math.hypot(dx, dy));
+      const nx = -dy / len;
+      const ny = dx / len;
+      const hw = w / 2;
+      const c = 0.34;
+      const c1x = x1 + dx * c;
+      const c1y = y1 + dy * c;
+      const c2x = x2 - dx * c;
+      const c2y = y2 - dy * c;
+      const p1x = x1 + nx * hw;
+      const p1y = y1 + ny * hw;
+      const p2x = x2 + nx * hw;
+      const p2y = y2 + ny * hw;
+      const p3x = x2 - nx * hw;
+      const p3y = y2 - ny * hw;
+      const p4x = x1 - nx * hw;
+      const p4y = y1 - ny * hw;
+      return `M ${p1x} ${p1y} C ${c1x + nx * hw} ${c1y + ny * hw}, ${c2x + nx * hw} ${c2y + ny * hw}, ${p2x} ${p2y} L ${p3x} ${p3y} C ${c2x - nx * hw} ${c2y - ny * hw}, ${c1x - nx * hw} ${c1y - ny * hw}, ${p4x} ${p4y} Z`;
+    };
+
+    const nlNode = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+    nlNode.setAttribute("cx", String(NL.x));
+    nlNode.setAttribute("cy", String(NL.y));
+    nlNode.setAttribute("r", "18");
+    nlNode.setAttribute("class", "flow-map-node-nl");
+    svg.appendChild(nlNode);
+    const nlText = document.createElementNS("http://www.w3.org/2000/svg", "text");
+    nlText.setAttribute("x", String(NL.x));
+    nlText.setAttribute("y", String(NL.y + 4));
+    nlText.setAttribute("text-anchor", "middle");
+    nlText.setAttribute("class", "flow-map-label-nl");
+    nlText.textContent = "NL";
+    svg.appendChild(nlText);
+
+    for (const [name, anchor] of Object.entries(anchors)) {
+      const row = rowByName.get(name);
+      const value = Number(row?.value);
+      const finite = Number.isFinite(value);
+      if (finite) {
+        const bandWidth = Math.max(4, Math.min(22, (Math.abs(value) / maxAbs) * 22));
+        const band = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        band.setAttribute("d", ribbonPath(anchor.x, anchor.y, NL.x, NL.y, bandWidth));
+        band.setAttribute("class", `flow-sankey-band ${value < 0 ? "flow-sankey-band-export" : "flow-sankey-band-import"}`);
+        svg.appendChild(band);
+
+        const lbl = document.createElementNS("http://www.w3.org/2000/svg", "text");
+        lbl.setAttribute("x", String((anchor.x + NL.x) / 2));
+        lbl.setAttribute("y", String((anchor.y + NL.y) / 2 - 4));
+        lbl.setAttribute("text-anchor", "middle");
+        lbl.setAttribute("class", `flow-map-value ${value < 0 ? "flow-map-value-export" : "flow-map-value-import"}`);
+        lbl.textContent = `${Math.round(value)}`;
+        svg.appendChild(lbl);
+      }
+
+      const node = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+      node.setAttribute("cx", String(anchor.x));
+      node.setAttribute("cy", String(anchor.y));
+      node.setAttribute("r", "11");
+      const rowName = String(name || "").toLowerCase();
+      const isLng = rowName.startsWith("lng");
+      const isStorage = rowName.startsWith("gasopslag");
+      node.setAttribute("class", isLng ? "flow-map-node flow-map-node-lng" : "flow-map-node");
+      if (isStorage) node.setAttribute("class", "flow-map-node flow-map-node-storage");
+      svg.appendChild(node);
+
+      const code = document.createElementNS("http://www.w3.org/2000/svg", "text");
+      code.setAttribute("x", String(anchor.x));
+      code.setAttribute("y", String(anchor.y - 16));
+      code.setAttribute("text-anchor", "middle");
+      code.setAttribute("class", "flow-map-label");
+      code.textContent = anchor.label;
+      svg.appendChild(code);
+
+      const lbl = document.createElementNS("http://www.w3.org/2000/svg", "text");
+      lbl.setAttribute("x", String(anchor.x));
+      lbl.setAttribute("y", String(anchor.y + 24));
+      lbl.setAttribute("text-anchor", "middle");
+      lbl.setAttribute("class", "flow-map-country-name");
+      lbl.textContent = name;
+      svg.appendChild(lbl);
+    }
+
+    const foot = document.createElementNS("http://www.w3.org/2000/svg", "text");
+    foot.setAttribute("x", String(width - 18));
+    foot.setAttribute("y", String(height - 12));
+    foot.setAttribute("text-anchor", "end");
+    foot.setAttribute("class", "flow-map-country-name");
+    foot.textContent = "Getallen in GWh/dag";
+    svg.appendChild(foot);
+    return svg;
+  }
 
   const countries = isGas
     ? [
