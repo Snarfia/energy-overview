@@ -13,7 +13,7 @@ const pagePanels = {
   gas: document.getElementById("page-gas"),
 };
 
-const ELECTRICITY_DEMAND_IDS = new Set(["nlElectricityOverview", "nlGenerationMixShare", "tennetRegulation", "nlGridFrequency", "nlCrossBorderFlows"]);
+const ELECTRICITY_DEMAND_IDS = new Set(["nlElectricityOverview", "tennetRegulation", "nlGridFrequency", "nlCrossBorderFlows"]);
 const ELECTRICITY_WHOLESALE_IDS = new Set(["dayAheadPower24h", "ets", "tennetSettlement"]);
 const ELECTRICITY_RETAIL_IDS = new Set(["gaslichtElectricity"]);
 
@@ -845,7 +845,7 @@ function splitItems(items) {
     else if (GAS_RETAIL_IDS.has(item.id)) gas.retail.push(item);
   }
 
-  const electricityDemandOrder = ["nlElectricityOverview", "nlGenerationMixShare", "tennetRegulation", "nlGridFrequency", "nlCrossBorderFlows"];
+  const electricityDemandOrder = ["nlElectricityOverview", "tennetRegulation", "nlGridFrequency", "nlCrossBorderFlows"];
   electricity.demand.sort((a, b) => {
     const ia = electricityDemandOrder.indexOf(a.id);
     const ib = electricityDemandOrder.indexOf(b.id);

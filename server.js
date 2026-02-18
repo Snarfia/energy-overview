@@ -18,6 +18,9 @@ const TENNET_TOKEN = (process.env.TENNET_API_KEY || 'eb4e6c26-e63d-43f4-b3dd-da3
 const ENTSOE_BASE = 'https://web-api.tp.entsoe.eu/api';
 const ENTSOG_BASE = 'https://transparency.entsog.eu/api/v1';
 const ENTSOG_NL_OPERATOR = 'NL-TSO-0001';
+const OVERSTAPPEN_GAS_URL = 'https://www.overstappen.nl/energie/gasprijzen/';
+const OVERSTAPPEN_POWER_URL = 'https://www.overstappen.nl/energie/stroomprijs/';
+const OVERSTAPPEN_DISCLAIMER = 'De getoonde tarieven (inclusief energiebelasting en btw, kortingen en contractvoorwaarden) komen rechtstreeks van de energieleveranciers.';
 
 function toNumber(value) {
   if (value === null || value === undefined) return null;
@@ -1410,264 +1413,82 @@ async function getNlGasConsumptionBreakdownFallbackEntsog() {
   };
 }
 
-async function getGaslichtCheapest(kind) {
+async function getOverstappenReference(kind) {
   const isGas = kind === 'gas';
-  const candidateUrls = isGas
-    ? [
-        'https://www.gaslicht.com/gas-vergelijken/resultaten?showonlyswitchable=False&contracttype=Vast&gasverbruik=1000',
-        'https://www.gaslicht.com/gas-vergelijken/resultaten?showonlyswitchable=False&gasverbruik=1000',
-        'https://www.gaslicht.com/gas-vergelijken/',
-      ]
-    : [
-        'https://www.gaslicht.com/stroom-vergelijken/resultaten?showonlyswitchable=False&contracttype=Vast&stroomhoogverbruik=1000&stroomlaagverbruik=1000',
-        'https://www.gaslicht.com/stroom-vergelijken/resultaten?showonlyswitchable=False&stroomhoogverbruik=1000&stroomlaagverbruik=1000',
-        'https://www.gaslicht.com/stroom-vergelijken/',
-      ];
-  let html = '';
-  let sourceUrl = candidateUrls[0];
-  let lastFetchErr = null;
-  for (const url of candidateUrls) {
-    try {
-      html = await fetchText(url, {}, 15000);
-      sourceUrl = url;
-      if (html && html.length > 500) break;
-    } catch (err) {
-      lastFetchErr = err;
-    }
-  }
-  if (!html) throw new Error(`Could not load Gaslicht results (${String(lastFetchErr?.message || lastFetchErr || 'empty response')})`);
+  const url = isGas ? OVERSTAPPEN_GAS_URL : OVERSTAPPEN_POWER_URL;
+  const html = await fetchText(url, {}, 15000);
   const unit = isGas ? 'EUR/m3' : 'EUR/kWh';
-  const targetUnit = isGas ? 'm3' : 'kwh';
+  const unitToken = isGas ? '(?:m3|m³)' : 'kwh';
 
-  // Step 1: parse product payloads and pick the cheapest contract by total contract costs.
-  const products = [];
-  const productRe = /data-product=(?:"([^"]+)"|'([^']+)')/gi;
-  let pm;
-  while ((pm = productRe.exec(html))) {
-    const raw = htmlDecode(pm[1] || pm[2] || '');
-    try {
-      const parsed = JSON.parse(raw);
-      if (parsed && typeof parsed === 'object') products.push(parsed);
-    } catch {
-      // skip invalid payload
-    }
-  }
-  if (!products.length) {
-    const encodedObjects = html.match(/\{&quot;PackageUrl&quot;:[\s\S]*?\}/g) || [];
-    for (const encoded of encodedObjects) {
-      try {
-        const parsed = JSON.parse(htmlDecode(encoded));
-        if (parsed && typeof parsed === 'object') products.push(parsed);
-      } catch {
-        // skip invalid payload
-      }
-    }
-  }
-
-  const totalCostOf = (p) => {
-    const totalKeys = ['PackageCosts', 'Price', 'PackageCost', 'TotalPrice', 'MonthlyCosts'];
-    const bonusKeys = ['WelcomeBonus', 'welcomeBonus', 'Bonus'];
-    let total = null;
-    for (const k of totalKeys) {
-      const n = toNumber(p?.[k]);
-      if (n !== null) {
-        total = n;
-        break;
-      }
-    }
-    if (total === null) return null;
-    let bonus = 0;
-    for (const k of bonusKeys) {
-      const n = toNumber(p?.[k]);
-      if (n !== null) {
-        bonus = n;
-        break;
-      }
-    }
-    return total + bonus;
-  };
-
-  let cheapestProduct = null;
-  let cheapestCost = null;
-  for (const p of products) {
-    const c = totalCostOf(p);
-    if (c === null) continue;
-    if (cheapestProduct === null || c < cheapestCost) {
-      cheapestProduct = p;
-      cheapestCost = c;
-    }
-  }
-  if (!cheapestProduct) throw new Error('Could not determine cheapest Gaslicht contract by total costs');
-
-  const pkgPath = String(cheapestProduct?.PackageUrl || '');
-  const detailUrl = pkgPath.startsWith('/') ? `https://www.gaslicht.com${pkgPath}` : sourceUrl;
-
-  // Step 2: parse commodity unit-price (incl taxes) from contract detail page.
-  const detailHtml = await fetchText(detailUrl, {}, 15000);
-
-  const normalizeCommodity = (raw, unitHint, context = '') => {
-    let n = toNumber(raw);
-    if (n === null || n <= 0) return null;
-    const ctx = `${String(unitHint || '').toLowerCase()} ${String(context || '').toLowerCase()}`;
-    const hasUnit = targetUnit === 'm3' ? (ctx.includes('m3') || ctx.includes('m³')) : ctx.includes('kwh');
-    if (!hasUnit) return null;
-    if (ctx.includes('teruglever') || ctx.includes('feed') || ctx.includes('invoed')) return null;
-    if (ctx.includes('vastrecht') || ctx.includes('abon')) return null;
-    if (n > 10) n = n / 100;
-    if (targetUnit === 'm3') return n >= 0.2 && n <= 5 ? n : null;
-    return n >= 0.03 && n <= 2 ? n : null;
-  };
-
-  const unitPatterns = targetUnit === 'm3'
-    ? [
-        /([0-9]+(?:[.,][0-9]+)?)\s*(ct|cent|eur|€)?\s*\/\s*(m3|m³)/ig,
-        /(m3|m³)[^0-9]{0,28}([0-9]+(?:[.,][0-9]+)?)/ig,
-      ]
-    : [
-        /([0-9]+(?:[.,][0-9]+)?)\s*(ct|cent|eur|€)?\s*\/\s*(kwh)/ig,
-        /(kwh)[^0-9]{0,28}([0-9]+(?:[.,][0-9]+)?)/ig,
-      ];
-
-  const prices = [];
-  for (const re of unitPatterns) {
+  const pricePatterns = [
+    new RegExp(`€\\s*([0-9]+(?:[.,][0-9]{2,4})?)\\s*(?:per|/)\\s*${unitToken}`, 'ig'),
+    new RegExp(`([0-9]+(?:[.,][0-9]{2,4})?)\\s*(?:€|eur)?\\s*(?:per|/)\\s*${unitToken}`, 'ig'),
+    new RegExp(`(?:tarief|prijs)[^0-9]{0,30}([0-9]+(?:[.,][0-9]{2,4})?)`, 'ig'),
+  ];
+  const foundPrices = [];
+  for (const re of pricePatterns) {
     let m;
-    while ((m = re.exec(detailHtml))) {
-      const tokenA = m[1];
-      const tokenB = m[2];
-      const tokenC = m[3];
-      const num = tokenB && (String(tokenA).toLowerCase() === targetUnit || String(tokenA).toLowerCase() === 'm³') ? tokenB : tokenA;
-      const unitHint = tokenC || tokenA || targetUnit;
-      const ctx = detailHtml.slice(Math.max(0, m.index - 80), Math.min(detailHtml.length, m.index + 180));
-      const n = normalizeCommodity(num, unitHint, ctx);
-      if (n !== null) prices.push({ value: n, ctx: ctx.toLowerCase() });
-    }
-  }
-
-  if (!prices.length) {
-    // fallback: parse same commodity unit from product payload of selected contract
-    const payloadText = JSON.stringify(cheapestProduct);
-    for (const re of unitPatterns) {
-      let m;
-      while ((m = re.exec(payloadText))) {
-        const num = m[2] && (String(m[1]).toLowerCase() === targetUnit || String(m[1]).toLowerCase() === 'm³') ? m[2] : m[1];
-        const unitHint = m[3] || m[1] || targetUnit;
-        const n = normalizeCommodity(num, unitHint, payloadText);
-        if (n !== null) prices.push({ value: n, ctx: payloadText.toLowerCase() });
-      }
-    }
-  }
-
-  if (!prices.length) {
-    // fallback: direct key-based extraction from cheapest contract payload
-    const directPriceKeys = isGas
-      ? ['gas', 'm3', 'm³', 'commodity', 'leveringstarief', 'allin', 'all-in', 'term', 'tarief', 'price']
-      : ['stroom', 'kwh', 'commodity', 'leveringstarief', 'allin', 'all-in', 'term', 'tarief', 'price'];
-    function walkDirect(obj, path = []) {
-      if (Array.isArray(obj)) {
-        for (let i = 0; i < obj.length; i += 1) walkDirect(obj[i], [...path, String(i)]);
-        return;
-      }
-      if (!obj || typeof obj !== 'object') return;
-      for (const [k, v] of Object.entries(obj)) {
-        const nextPath = [...path, k];
-        if (v && typeof v === 'object') {
-          walkDirect(v, nextPath);
-          continue;
-        }
-        const n = toNumber(v);
-        if (n === null) continue;
-        const blob = nextPath.join(' ').toLowerCase();
-        if (!directPriceKeys.some((kw) => blob.includes(kw))) continue;
-        if (['bonus', 'vastrecht', 'abonnement', 'total', 'packagecost', 'monthly', 'year', 'jaar'].some((kw) => blob.includes(kw))) continue;
-        let normalized = n > 10 ? n / 100 : n;
-        if (isGas && normalized >= 0.2 && normalized <= 5) prices.push({ value: normalized, ctx: blob });
-        if (!isGas && normalized >= 0.03 && normalized <= 2) prices.push({ value: normalized, ctx: blob });
-      }
-    }
-    walkDirect(cheapestProduct, []);
-  }
-
-  if (!prices.length) {
-    // Fallback without explicit unit markers: infer commodity field by key/context hints.
-    function* walk(obj, path = []) {
-      if (Array.isArray(obj)) {
-        for (let i = 0; i < obj.length; i += 1) yield* walk(obj[i], [...path, String(i)]);
-        return;
-      }
-      if (!obj || typeof obj !== 'object') return;
-      for (const [k, v] of Object.entries(obj)) {
-        const nextPath = [...path, k];
-        yield [nextPath, v, obj];
-        if (v && typeof v === 'object') yield* walk(v, nextPath);
-      }
-    }
-
-    const keyHints = isGas
-      ? ['gas', 'm3', 'm³', 'commodity', 'leveringstarief', 'allin', 'all-in', 'prijs']
-      : ['stroom', 'elek', 'kwh', 'commodity', 'leveringstarief', 'allin', 'all-in', 'prijs', 'enkel', 'dal'];
-    const badHints = ['bonus', 'vastrecht', 'abonnement', 'teruglever', 'feed', 'monthly', 'year', 'jaar', 'packagecost', 'total'];
-
-    for (const [path, v, parent] of walk(cheapestProduct)) {
-      if (!(typeof v === 'number' || typeof v === 'string')) continue;
-      const n = toNumber(v);
+    while ((m = re.exec(html))) {
+      const n = toNumber(m[1]);
       if (n === null) continue;
-      const rawText = String(v).trim();
-      const pathBlob = path.join('.').toLowerCase();
-      const parentBlob = Object.entries(parent || {})
-        .map(([k, val]) => `${k}:${typeof val === 'string' ? val : ''}`)
-        .join(' ')
-        .toLowerCase();
-      const blob = `${pathBlob} ${parentBlob}`;
-      if (!keyHints.some((h) => blob.includes(h))) continue;
-      if (badHints.some((h) => blob.includes(h))) continue;
+      if (isGas && n >= 0.2 && n <= 5) foundPrices.push(n);
+      if (!isGas && n >= 0.03 && n <= 2) foundPrices.push(n);
+    }
+  }
+  if (!foundPrices.length) throw new Error('Could not parse reference commodity price from Overstappen');
+  const price = foundPrices.sort((a, b) => a - b)[0];
 
-      const hasExplicitPriceHint =
-        blob.includes('tarief') ||
-        blob.includes('rate') ||
-        blob.includes('prijs') ||
-        blob.includes('price') ||
-        blob.includes('levering');
-
-      // Reject likely non-price integers unless explicit price context is present.
-      const hasDecimalInRaw = /[.,]\d+/.test(rawText);
-      if (!hasDecimalInRaw && !hasExplicitPriceHint) continue;
-
-      const normalized = n > 10 ? n / 100 : n;
-      if (isGas) {
-        if (normalized >= 0.2 && normalized <= 5) {
-          if (Number.isInteger(normalized) && !hasDecimalInRaw) continue;
-          prices.push({ value: normalized, ctx: blob });
-        }
-      } else if (normalized >= 0.03 && normalized <= 2) {
-        if (Number.isInteger(normalized) && !hasDecimalInRaw) continue;
-        prices.push({ value: normalized, ctx: blob });
-      }
+  const providerPatterns = [
+    /(?:aanbieder|leverancier)[^a-z0-9]{0,20}([A-Z][A-Za-z0-9&'’\-\s]{2,40})/i,
+    /"name"\s*:\s*"([^"]{2,60})"/i,
+  ];
+  let provider = 'Onbekend';
+  for (const re of providerPatterns) {
+    const m = html.match(re);
+    if (m?.[1]) {
+      provider = String(m[1]).trim();
+      break;
     }
   }
 
-  if (!prices.length) throw new Error('Could not parse commodity unit price from cheapest contract details/payload');
-
-  const inclFirst = prices.filter((p) => p.ctx.includes('incl') || p.ctx.includes('inclusief') || p.ctx.includes('belasting') || p.ctx.includes('all-in'));
-  const chosen = (inclFirst.length ? inclFirst : prices).sort((a, b) => a.value - b.value)[0];
+  const periodPatterns = [
+    /(dynamisch)/i,
+    /(vast)\s*([0-9]{1,2})\s*(jaar|maand)/i,
+    /([0-9]{1,2})\s*(jaar|maand)\s*(vast)/i,
+  ];
+  let contract = 'Onbekend';
+  for (const re of periodPatterns) {
+    const m = html.match(re);
+    if (!m) continue;
+    if (m[1] && m[1].toLowerCase() === 'dynamisch') {
+      contract = 'Dynamisch';
+      break;
+    }
+    const parts = m.slice(1).filter(Boolean).map((x) => String(x).trim());
+    if (parts.length) {
+      contract = parts.join(' ');
+      break;
+    }
+  }
 
   return {
     id: isGas ? 'gaslichtGas' : 'gaslichtElectricity',
-    label: isGas ? 'Cheapest Gas Provider (Gaslicht)' : 'Cheapest Electricity Provider (Gaslicht)',
-    value: chosen.value,
+    label: isGas ? 'Gas referentieprijs (Overstappen.nl)' : 'Stroom referentieprijs (Overstappen.nl)',
+    value: price,
     unit,
-    source: 'Gaslicht',
-    sourceUrl: detailUrl,
+    source: 'Overstappen.nl',
+    sourceUrl: url,
     updatedAt: new Date().toISOString(),
-    detail: 'Goedkoopste contract op totale kosten; commodity-prijs uit contractdetails (incl belastingen indien beschikbaar)',
+    detail: `Aanbieder: ${provider} | Contract: ${contract} | ${OVERSTAPPEN_DISCLAIMER}`,
   };
 }
 
-async function getGaslichtCheapestElectricity() {
-  return getGaslichtCheapest('power');
+async function getOverstappenElectricityReference() {
+  return getOverstappenReference('power');
 }
 
-async function getGaslichtCheapestGas() {
-  return getGaslichtCheapest('gas');
+async function getOverstappenGasReference() {
+  return getOverstappenReference('gas');
 }
 
 async function collectOverview() {
@@ -1685,7 +1506,6 @@ async function collectOverview() {
     [getDayAheadPower24h, { id: 'dayAheadPower24h', label: 'EPEX SPOT Day-Ahead NL (24h vooruit)', value: null, unit: 'EUR/MWh', source: 'ENTSO-E Transparency API (EPEX SPOT NL)', sourceUrl: ENTSOE_BASE, updatedAt: new Date().toISOString(), detail: 'Bron tijdelijk niet bereikbaar', rows: fallbackRows24 }],
     [getTTFGas, { id: 'ttfGas', label: 'TTF Gas', value: null, unit: 'EUR/MWh', source: 'TradingEconomics', sourceUrl: 'https://tradingeconomics.com/commodity/eu-natural-gas', updatedAt: new Date().toISOString(), detail: 'Bron tijdelijk niet bereikbaar' }],
     [getETSPrice, { id: 'ets', label: 'EU ETS (ICE EUA Futures)', value: null, unit: 'EUR/tCO2', source: 'Barchart', sourceUrl: 'https://www.barchart.com/futures/quotes/CKJ26', updatedAt: new Date().toISOString(), detail: 'Bron tijdelijk niet bereikbaar' }],
-    [getGenerationMixShare, { id: 'nlGenerationMixShare', label: 'Opwek Mix NL (actuele verhouding)', value: null, unit: '', valueText: 'Verhouding per bron', source: 'ENTSO-E Transparency API', sourceUrl: ENTSOE_BASE, updatedAt: new Date().toISOString(), detail: 'Bron tijdelijk niet bereikbaar', rows: [] }],
     [getNlGasImport, { id: 'nlGasImport', label: 'Netto in- en uitstroom aardgas', value: null, unit: 'GWh/d', source: 'ENTSOG API', sourceUrl: ENTSOG_BASE, updatedAt: new Date().toISOString(), detail: 'Bron tijdelijk niet bereikbaar', rows: [{ hour: 'Belgie', value: null, unit: 'GWh/d' }, { hour: 'Duitsland', value: null, unit: 'GWh/d' }, { hour: 'Verenigd Koninkrijk', value: null, unit: 'GWh/d' }, { hour: 'Denemarken', value: null, unit: 'GWh/d' }, { hour: 'Noorwegen', value: null, unit: 'GWh/d' }, { hour: 'LNG (Gate+EET)', value: null, unit: 'GWh/d' }, { hour: 'Gasopslag (4 sites)', value: null, unit: 'GWh/d' }, { hour: 'Nationale productie', value: null, unit: 'GWh/d' }] }],
     [getNlGasProduction, { id: 'nlGasProduction', label: 'Gaswinning NL (laatste dag)', value: null, unit: 'GWh/d', source: 'ENTSOG API', sourceUrl: ENTSOG_BASE, updatedAt: new Date().toISOString(), detail: 'Bron tijdelijk niet bereikbaar' }],
     [getEntsoeCrossBorderFlows, { id: 'nlCrossBorderFlows', label: 'Cross-Border Physical Flows NL (live, netto)', value: null, unit: 'MW', source: 'ENTSO-E Transparency API', sourceUrl: ENTSOE_BASE, updatedAt: new Date().toISOString(), detail: 'Bron tijdelijk niet bereikbaar', rows: [{ hour: 'Belgie', value: null, unit: 'MW' }, { hour: 'Duitsland', value: null, unit: 'MW' }, { hour: 'Verenigd Koninkrijk', value: null, unit: 'MW' }, { hour: 'Denemarken', value: null, unit: 'MW' }, { hour: 'Noorwegen', value: null, unit: 'MW' }] }],
@@ -1701,8 +1521,8 @@ async function collectOverview() {
     }, { id: 'nlGasConsumptionBreakdown', label: 'Gasconsumptie NL (laatste volledige dag)', value: null, unit: 'GWh/d', source: 'NED API', sourceUrl: 'https://api.ned.nl/v1/utilizations', updatedAt: new Date().toISOString(), detail: 'Bron tijdelijk niet bereikbaar', rows: [] }],
     [getTennetRegulation, { id: 'tennetRegulation', label: 'TenneT Balance Delta (actueel, 12s)', value: null, unit: 'MW', source: 'TenneT API (Balance Delta High Res)', sourceUrl: 'https://api.tennet.eu/publications/v1/balance-delta-high-res/latest', updatedAt: new Date().toISOString(), detail: 'Bron tijdelijk niet bereikbaar' }],
     [getTennetSettlement, { id: 'tennetSettlement', label: 'TenneT Settlement Price (actueel)', value: null, unit: 'EUR/MWh', source: 'TenneT API (Settlement Prices)', sourceUrl: 'https://api.tennet.eu/publications/v1/settlement-prices', updatedAt: new Date().toISOString(), detail: 'Bron tijdelijk niet bereikbaar' }],
-    [getGaslichtCheapestElectricity, { id: 'gaslichtElectricity', label: 'Cheapest Electricity Provider (Gaslicht)', value: null, unit: 'EUR/kWh', source: 'Gaslicht', sourceUrl: 'https://www.gaslicht.com/stroom-vergelijken/resultaten?showonlyswitchable=False&contracttype=Vast&stroomhoogverbruik=1000&stroomlaagverbruik=1000', updatedAt: new Date().toISOString(), detail: 'Bron tijdelijk niet bereikbaar' }],
-    [getGaslichtCheapestGas, { id: 'gaslichtGas', label: 'Cheapest Gas Provider (Gaslicht)', value: null, unit: 'EUR/m3', source: 'Gaslicht', sourceUrl: 'https://www.gaslicht.com/gas-vergelijken/resultaten?showonlyswitchable=False&contracttype=Vast&gasverbruik=1000', updatedAt: new Date().toISOString(), detail: 'Bron tijdelijk niet bereikbaar' }],
+    [getOverstappenElectricityReference, { id: 'gaslichtElectricity', label: 'Stroom referentieprijs (Overstappen.nl)', value: null, unit: 'EUR/kWh', source: 'Overstappen.nl', sourceUrl: OVERSTAPPEN_POWER_URL, updatedAt: new Date().toISOString(), detail: 'Bron tijdelijk niet bereikbaar' }],
+    [getOverstappenGasReference, { id: 'gaslichtGas', label: 'Gas referentieprijs (Overstappen.nl)', value: null, unit: 'EUR/m3', source: 'Overstappen.nl', sourceUrl: OVERSTAPPEN_GAS_URL, updatedAt: new Date().toISOString(), detail: 'Bron tijdelijk niet bereikbaar' }],
   ];
 
   // Keep the same card layout for remaining Gaslicht cards that are not migrated yet.
