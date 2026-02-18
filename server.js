@@ -1447,7 +1447,48 @@ async function getGaslichtCheapest(kind) {
     }
   }
 
-  if (!prices.length) throw new Error('Could not parse commodity unit price from cheapest contract details');
+  if (!prices.length) {
+    // Fallback without explicit unit markers: infer commodity field by key/context hints.
+    function* walk(obj, path = []) {
+      if (Array.isArray(obj)) {
+        for (let i = 0; i < obj.length; i += 1) yield* walk(obj[i], [...path, String(i)]);
+        return;
+      }
+      if (!obj || typeof obj !== 'object') return;
+      for (const [k, v] of Object.entries(obj)) {
+        const nextPath = [...path, k];
+        yield [nextPath, v, obj];
+        if (v && typeof v === 'object') yield* walk(v, nextPath);
+      }
+    }
+
+    const keyHints = isGas
+      ? ['gas', 'm3', 'm³', 'commodity', 'leveringstarief', 'allin', 'all-in', 'prijs']
+      : ['stroom', 'elek', 'kwh', 'commodity', 'leveringstarief', 'allin', 'all-in', 'prijs', 'enkel', 'dal'];
+    const badHints = ['bonus', 'vastrecht', 'abonnement', 'teruglever', 'feed', 'monthly', 'year', 'jaar', 'packagecost', 'total'];
+
+    for (const [path, v, parent] of walk(cheapestProduct)) {
+      if (!(typeof v === 'number' || typeof v === 'string')) continue;
+      const n = toNumber(v);
+      if (n === null) continue;
+      const pathBlob = path.join('.').toLowerCase();
+      const parentBlob = Object.entries(parent || {})
+        .map(([k, val]) => `${k}:${typeof val === 'string' ? val : ''}`)
+        .join(' ')
+        .toLowerCase();
+      const blob = `${pathBlob} ${parentBlob}`;
+      if (!keyHints.some((h) => blob.includes(h))) continue;
+      if (badHints.some((h) => blob.includes(h))) continue;
+      const normalized = n > 10 ? n / 100 : n;
+      if (isGas) {
+        if (normalized >= 0.2 && normalized <= 5) prices.push({ value: normalized, ctx: blob });
+      } else if (normalized >= 0.03 && normalized <= 2) {
+        prices.push({ value: normalized, ctx: blob });
+      }
+    }
+  }
+
+  if (!prices.length) throw new Error('Could not parse commodity unit price from cheapest contract details/payload');
 
   const inclFirst = prices.filter((p) => p.ctx.includes('incl') || p.ctx.includes('inclusief') || p.ctx.includes('belasting') || p.ctx.includes('all-in'));
   const chosen = (inclFirst.length ? inclFirst : prices).sort((a, b) => a.value - b.value)[0];
