@@ -1471,6 +1471,7 @@ async function getGaslichtCheapest(kind) {
       if (!(typeof v === 'number' || typeof v === 'string')) continue;
       const n = toNumber(v);
       if (n === null) continue;
+      const rawText = String(v).trim();
       const pathBlob = path.join('.').toLowerCase();
       const parentBlob = Object.entries(parent || {})
         .map(([k, val]) => `${k}:${typeof val === 'string' ? val : ''}`)
@@ -1479,10 +1480,26 @@ async function getGaslichtCheapest(kind) {
       const blob = `${pathBlob} ${parentBlob}`;
       if (!keyHints.some((h) => blob.includes(h))) continue;
       if (badHints.some((h) => blob.includes(h))) continue;
+
+      const hasExplicitPriceHint =
+        blob.includes('tarief') ||
+        blob.includes('rate') ||
+        blob.includes('prijs') ||
+        blob.includes('price') ||
+        blob.includes('levering');
+
+      // Reject likely non-price integers unless explicit price context is present.
+      const hasDecimalInRaw = /[.,]\d+/.test(rawText);
+      if (!hasDecimalInRaw && !hasExplicitPriceHint) continue;
+
       const normalized = n > 10 ? n / 100 : n;
       if (isGas) {
-        if (normalized >= 0.2 && normalized <= 5) prices.push({ value: normalized, ctx: blob });
+        if (normalized >= 0.2 && normalized <= 5) {
+          if (Number.isInteger(normalized) && !hasDecimalInRaw) continue;
+          prices.push({ value: normalized, ctx: blob });
+        }
       } else if (normalized >= 0.03 && normalized <= 2) {
+        if (Number.isInteger(normalized) && !hasDecimalInRaw) continue;
         prices.push({ value: normalized, ctx: blob });
       }
     }
@@ -1558,7 +1575,8 @@ async function collectOverview() {
       errors.push({ source: fn.name, error: String(err.message || err) });
       const fbId = fb?.id ? String(fb.id) : null;
       const previous = fbId ? previousById.get(fbId) : null;
-      if (previous && hasUsefulValue(previous)) {
+      const isGaslichtRetail = fbId === 'gaslichtGas' || fbId === 'gaslichtElectricity';
+      if (!isGaslichtRetail && previous && hasUsefulValue(previous)) {
         items.push(cachedItemWithError(previous, err));
       } else if (fb) {
         items.push(fallbackItem(fb, err));
