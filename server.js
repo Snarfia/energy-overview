@@ -1420,6 +1420,28 @@ async function getOverstappenReference(kind) {
   const unit = isGas ? 'EUR/m3' : 'EUR/kWh';
   const unitToken = isGas ? '(?:m3|m³)' : 'kwh';
 
+  if (isGas) {
+    const directRow = html.match(/([A-Z][A-Za-z0-9&'’\-\s]{2,40})\s*(Vast|Dynamisch)\s*([0-9]{1,2}\s*(?:jaar|maand))?[\s\S]{0,120}?€\s*([0-9]+(?:[.,][0-9]{2,4})?)/i);
+    if (directRow) {
+      const provider = String(directRow[1] || '').trim();
+      const contractType = String(directRow[2] || '').trim();
+      const period = String(directRow[3] || '').trim();
+      const value = toNumber(directRow[4]);
+      if (value !== null && value > 0 && value < 5) {
+        return {
+          id: 'gaslichtGas',
+          label: 'Gas referentieprijs (Overstappen.nl)',
+          value,
+          unit,
+          source: 'Overstappen.nl',
+          sourceUrl: url,
+          updatedAt: new Date().toISOString(),
+          detail: `Aanbieder: ${provider} | Contract: ${contractType}${period ? ` ${period}` : ''} | De laagste prijs voor aardgas, inclusief belastingen, voor huishoudens`,
+        };
+      }
+    }
+  }
+
   if (!isGas) {
     const directRow = html.match(/(Vast|Dynamisch)\s*([0-9]{1,2}\s*(?:jaar|maand))?[\s\S]{0,120}?€\s*([0-9]+(?:[.,][0-9]{2,4})?)/i);
     if (directRow) {
