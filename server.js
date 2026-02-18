@@ -209,6 +209,9 @@ function getPreviousItemById(id) {
 
 function hasUsefulValue(item) {
   if (!item || typeof item !== 'object') return false;
+  if (item.id === 'nlGenerationMixShare') {
+    return Array.isArray(item.rows) && item.rows.some((r) => Number.isFinite(Number(r?.value)));
+  }
   if (item.value !== null && item.value !== undefined) return true;
   if (typeof item.valueText === 'string' && item.valueText.trim()) return true;
   if (Array.isArray(item.rows) && item.rows.some((r) => (r?.value !== null && r?.value !== undefined) || (typeof r?.valueText === 'string' && r.valueText.trim()))) return true;

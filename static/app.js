@@ -763,14 +763,20 @@ function createCard(item) {
     if (pie) cardEl.appendChild(pie);
   }
   if (item.id === "nlGenerationMixShare" && (!Array.isArray(item.rows) || item.rows.length === 0)) {
-    cardEl.classList.add("card-wide");
-    const frame = document.createElement("iframe");
-    frame.className = "mix-embed";
-    frame.loading = "lazy";
-    frame.referrerPolicy = "no-referrer";
-    frame.src = "https://ned.nl/nl/dataportaal/energie-productie/elektriciteit/totale-elektriciteitsproductie";
-    frame.title = "NED Productie elektriciteit van vandaag - totale mix";
-    cardEl.appendChild(frame);
+    const fallback = document.createElement("div");
+    fallback.className = "card-series";
+    const line = document.createElement("div");
+    line.className = "card-series-row";
+    line.textContent = "Mixdata tijdelijk niet beschikbaar.";
+    fallback.appendChild(line);
+    const link = document.createElement("a");
+    link.className = "source-link";
+    link.href = "https://ned.nl/nl/dataportaal/energie-productie/elektriciteit/totale-elektriciteitsproductie";
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+    link.textContent = "Open NED mixpagina";
+    fallback.appendChild(link);
+    cardEl.appendChild(fallback);
   }
 
   if (
