@@ -114,6 +114,17 @@ button:hover { filter: brightness(1.05); }
   padding-top: 0.6rem;
 }
 
+.mix-embed {
+  margin-top: 0.8rem;
+  width: 100%;
+  min-height: 360px;
+  height: 360px;
+  display: block;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+}
+
 .dayahead-plot-bg { fill: rgba(15, 122, 98, 0.04); }
 .dayahead-grid { stroke: rgba(26, 31, 29, 0.12); stroke-width: 1; }
 .dayahead-axis { stroke: rgba(26, 31, 29, 0.45); stroke-width: 1; }

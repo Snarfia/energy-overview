@@ -279,11 +279,20 @@ async function getDayAheadPower24h() {
 
   const nowHourUtc = new Date();
   nowHourUtc.setUTCMinutes(0, 0, 0);
+  const byHour = new Map();
+  for (const [iso, value] of hourMap.entries()) {
+    const d = new Date(iso);
+    const hh = String(d.getHours()).padStart(2, '0');
+    byHour.set(`${hh}:00`, value);
+  }
   const rows = [];
-  for (let i = 0; i < 24; i += 1) {
-    const t = new Date(nowHourUtc.getTime() + i * 3600_000);
-    const hh = String(t.getHours()).padStart(2, '0');
-    rows.push({ hour: `${hh}:00`, value: hourMap.get(t.toISOString()) ?? null, unit: 'EUR/MWh' });
+  for (let h = 5; h <= 23; h += 1) {
+    const key = `${String(h).padStart(2, '0')}:00`;
+    rows.push({ hour: key, value: byHour.get(key) ?? null, unit: 'EUR/MWh' });
+  }
+  for (let h = 0; h <= 4; h += 1) {
+    const key = `${String(h).padStart(2, '0')}:00`;
+    rows.push({ hour: key, value: byHour.get(key) ?? null, unit: 'EUR/MWh' });
   }
   const first = rows.find((r) => r.value !== null);
   const nowLabel = `${String(new Date().getHours()).padStart(2, '0')}:00`;

@@ -38,6 +38,11 @@ function formatNumber(value) {
   return Number(value).toLocaleString(undefined, { maximumFractionDigits: 2 });
 }
 
+function formatNumberFixed2(value) {
+  if (value === null || value === undefined || Number.isNaN(Number(value))) return "n/a";
+  return Number(value).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
 function formatTime(value) {
   if (!value) return "Update time unavailable";
   const parsed = new Date(value);
@@ -497,6 +502,9 @@ function createCard(item) {
   if (item.id === "nlCrossBorderFlows" && Number.isFinite(Number(item.value))) {
     shownValue = `${(Number(item.value) / 1000).toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} GW`;
   }
+  if ((item.id === "gaslichtGas" || item.id === "gaslichtElectricity") && Number.isFinite(Number(item.value))) {
+    shownValue = `${formatNumberFixed2(item.value)} ${item.unit}`;
+  }
   node.querySelector(".card-value").textContent = item.valueText ? item.valueText : shownValue;
   const detail = item.detail ? ` | ${item.detail}` : "";
   node.querySelector(".card-meta").textContent = `${item.source} | ${formatTime(item.updatedAt)}${detail}`;
@@ -523,6 +531,16 @@ function createCard(item) {
   if (item.id === "nlGenerationMixShare" && Array.isArray(item.rows) && item.rows.length > 0) {
     const pie = createGenerationPieChart(item.rows);
     if (pie) cardEl.appendChild(pie);
+  }
+  if (item.id === "nlGenerationMixShare" && (!Array.isArray(item.rows) || item.rows.length === 0)) {
+    cardEl.classList.add("card-wide");
+    const frame = document.createElement("iframe");
+    frame.className = "mix-embed";
+    frame.loading = "lazy";
+    frame.referrerPolicy = "no-referrer";
+    frame.src = "https://ned.nl/nl/dataportaal/energie-productie/elektriciteit/totale-elektriciteitsproductie";
+    frame.title = "NED Productie elektriciteit van vandaag - totale mix";
+    cardEl.appendChild(frame);
   }
 
   if (
