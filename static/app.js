@@ -15,11 +15,11 @@ const pagePanels = {
 
 const ELECTRICITY_DEMAND_IDS = new Set(["nlElectricityOverview", "nlGenerationMixShare", "tennetRegulation", "nlGridFrequency", "nlCrossBorderFlows"]);
 const ELECTRICITY_WHOLESALE_IDS = new Set(["dayAheadPower24h", "ets", "tennetSettlement"]);
-const ELECTRICITY_RETAIL_IDS = new Set(["gaslichtElectricity", "gaslichtLongestContractElectricity"]);
+const ELECTRICITY_RETAIL_IDS = new Set(["gaslichtElectricity"]);
 
 const GAS_DEMAND_IDS = new Set(["nlGasConsumptionBreakdown", "nlGasImport", "nlGasProduction", "nlGasStorage"]);
 const GAS_WHOLESALE_IDS = new Set(["ttfGas", "ets"]);
-const GAS_RETAIL_IDS = new Set(["gaslichtGas", "gaslichtLongestContract"]);
+const GAS_RETAIL_IDS = new Set(["gaslichtGas"]);
 
 let activePage = "electricity";
 
@@ -49,6 +49,18 @@ function extractHourLabel(rowHour) {
   if (!rowHour) return "";
   const m = String(rowHour).match(/(\d{2}:\d{2})/);
   return m ? m[1] : String(rowHour);
+}
+
+function orderDayAheadRowsForDisplay(rows) {
+  const byHour = new Map();
+  for (const row of rows || []) {
+    const h = extractHourLabel(row?.hour);
+    if (h) byHour.set(h, row);
+  }
+  const orderedHours = [];
+  for (let h = 5; h <= 23; h += 1) orderedHours.push(`${String(h).padStart(2, "0")}:00`);
+  for (let h = 0; h <= 4; h += 1) orderedHours.push(`${String(h).padStart(2, "0")}:00`);
+  return orderedHours.map((h) => byHour.get(h) || { hour: h, value: null, unit: "EUR/MWh" });
 }
 
 function createDayAheadChart(rows) {
@@ -223,7 +235,7 @@ function createCrossBorderFlowMap(rows, unitLabel = "MW", mode = "electricity") 
   const formatFlowLabel = (value) => {
     if (!Number.isFinite(value)) return "n/a";
     if (mode === "electricity") return `${(value / 1000).toFixed(1)} GW`;
-    return `${formatNumber(value)}`;
+    return `${Math.round(value)}`;
   };
   const ribbonPath = (x1, y1, x2, y2, w) => {
     const dx = x2 - x1;
@@ -494,7 +506,7 @@ function createCard(item) {
   if (item.id === "dayAheadPower24h" || item.id === "nlCrossBorderFlows" || item.id === "nlGasImport") cardEl.classList.add("card-wide");
 
   if (item.id === "dayAheadPower24h" && Array.isArray(item.rows) && item.rows.length > 0) {
-    const chart = createDayAheadChart(item.rows);
+    const chart = createDayAheadChart(orderDayAheadRowsForDisplay(item.rows));
     if (chart) cardEl.appendChild(chart);
   }
 

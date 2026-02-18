@@ -1329,9 +1329,9 @@ async function getGaslichtCheapest(kind) {
   }
   if (!html) throw new Error(`Could not load Gaslicht results (${String(lastFetchErr?.message || lastFetchErr || 'empty response')})`);
   const unit = isGas ? 'EUR/m3' : 'EUR/kWh';
-  const usage = isGas ? 1000 : 2000;
+  const targetUnit = isGas ? 'm3' : 'kwh';
 
-  // Preferred path: parse Gaslicht product payloads.
+  // Preferred path: parse Gaslicht product payloads for commodity rates only.
   const products = [];
   const productRe = /data-product=(?:"([^"]+)"|'([^']+)')/gi;
   let pm;
@@ -1359,137 +1359,83 @@ async function getGaslichtCheapest(kind) {
     }
   }
 
-  const productCost = (p) => {
-    const totalKeys = ['PackageCosts', 'Price', 'PackageCost', 'TotalPrice', 'MonthlyCosts'];
-    const bonusKeys = ['WelcomeBonus', 'welcomeBonus', 'Bonus'];
-    let total = null;
-    for (const k of totalKeys) {
-      const n = toNumber(p?.[k]);
-      if (n !== null) {
-        total = n;
-        break;
-      }
+  function* walk(obj) {
+    if (Array.isArray(obj)) {
+      for (const item of obj) yield* walk(item);
+      return;
     }
-    if (total === null) return null;
-    let bonus = 0;
-    for (const k of bonusKeys) {
-      const n = toNumber(p?.[k]);
-      if (n !== null) {
-        bonus = n;
-        break;
-      }
-    }
-    return total + bonus;
-  };
-
-  if (products.length) {
-    let best = null;
-    let bestCost = null;
-    for (const p of products) {
-      const c = productCost(p);
-      if (c === null) continue;
-      if (best === null || c < bestCost) {
-        best = p;
-        bestCost = c;
-      }
-    }
-    if (best && bestCost !== null) {
-      const pkg = String(best?.PackageUrl || '');
-      const src = pkg.startsWith('/') ? `https://www.gaslicht.com${pkg}` : sourceUrl;
-      return {
-        id: isGas ? 'gaslichtGas' : 'gaslichtElectricity',
-        label: isGas ? 'Cheapest Gas Provider (Gaslicht)' : 'Cheapest Electricity Provider (Gaslicht)',
-        value: bestCost / usage,
-        unit,
-        source: 'Gaslicht',
-        sourceUrl: src,
-        updatedAt: new Date().toISOString(),
-        detail: 'Goedkoopste contract op basis van productfeed (jaarkosten/bonus)',
-      };
+    if (!obj || typeof obj !== 'object') return;
+    for (const [k, v] of Object.entries(obj)) {
+      yield [k, v, obj];
+      if (v && typeof v === 'object') yield* walk(v);
     }
   }
 
-  if (impressions.length) {
-    const prices = impressions.map((x) => toNumber(x?.Price)).filter((x) => x !== null).sort((a, b) => a - b);
-    if (prices.length) {
-      return {
-        id: isGas ? 'gaslichtGas' : 'gaslichtElectricity',
-        label: isGas ? 'Cheapest Gas Provider (Gaslicht)' : 'Cheapest Electricity Provider (Gaslicht)',
-        value: prices[0] / usage,
-        unit,
-        source: 'Gaslicht',
-        sourceUrl,
-        updatedAt: new Date().toISOString(),
-        detail: 'Goedkoopste contract via GTM impression feed',
-      };
+  function normalizeCommodityPrice(rawNum, unitHint, keyHint = '', textHint = '') {
+    let n = toNumber(rawNum);
+    if (n === null || n <= 0) return null;
+    const u = String(unitHint || '').toLowerCase();
+    const k = String(keyHint || '').toLowerCase();
+    const t = String(textHint || '').toLowerCase();
+    const blob = `${u} ${k} ${t}`;
+    const hasTargetUnit = targetUnit === 'm3' ? (blob.includes('m3') || blob.includes('m³')) : blob.includes('kwh');
+    if (!hasTargetUnit) return null;
+    if (blob.includes('teruglever') || blob.includes('feed') || blob.includes('invoed')) return null;
+    if (blob.includes('vastrecht') || blob.includes('abon')) return null;
+    if (n > 10) n = n / 100; // cents to euros fallback
+    if (targetUnit === 'm3') return n >= 0.2 && n <= 5 ? n : null;
+    return n >= 0.03 && n <= 2 ? n : null;
+  }
+
+  const candidates = [];
+  for (const p of products) {
+    for (const [k, v, parent] of walk(p)) {
+      if (typeof v === 'number' || typeof v === 'string') {
+        const parentText = Object.values(parent || {}).filter((x) => typeof x === 'string').join(' ');
+        const c = normalizeCommodityPrice(v, k, k, parentText);
+        if (c !== null) candidates.push({ value: c, src: p });
+      }
     }
   }
 
-  const patterns = isGas
+  // Regex fallback on HTML around explicit unit prices in price details.
+  const htmlPatterns = targetUnit === 'm3'
     ? [
-        /([0-9]+[.,][0-9]{2,4})\s*(?:€|EUR)?\s*\/\s*(?:m3|m³)/i,
-        /(?:m3|m³)[^0-9]{0,16}([0-9]+[.,][0-9]{2,4})/i,
-        /"(?:price|priceInclTax|priceExclTax|tariff|rate)"\s*:\s*"?([0-9]+(?:[.,][0-9]{2,5})?)"?/ig,
+        /([0-9]+(?:[.,][0-9]+)?)\s*(ct|cent|eur|€)?\s*\/\s*(m3|m³)/ig,
+        /(m3|m³)[^0-9]{0,24}([0-9]+(?:[.,][0-9]+)?)/ig,
       ]
     : [
-        /([0-9]+[.,][0-9]{3,5})\s*(?:€|EUR)?\s*\/\s*kwh/i,
-        /kwh[^0-9]{0,16}([0-9]+[.,][0-9]{3,5})/i,
-        /"(?:price|priceInclTax|priceExclTax|tariff|rate)"\s*:\s*"?([0-9]+(?:[.,][0-9]{3,6})?)"?/ig,
+        /([0-9]+(?:[.,][0-9]+)?)\s*(ct|cent|eur|€)?\s*\/\s*(kwh)/ig,
+        /(kwh)[^0-9]{0,24}([0-9]+(?:[.,][0-9]+)?)/ig,
       ];
-  let value = null;
-  for (const re of patterns) {
-    if (re.flags && re.flags.includes('g')) {
-      const vals = [];
-      let m;
-      while ((m = re.exec(html))) {
-        const n = toNumber(m[1]);
-        if (n !== null) vals.push(n);
-      }
-      const plausible = vals.find((n) => (isGas ? (n >= 0.2 && n <= 5) : (n >= 0.03 && n <= 2)));
-      if (plausible !== undefined) {
-        value = plausible;
-        break;
-      }
-    } else {
-      const m = html.match(re);
-      if (m) {
-        value = toNumber(m[1]);
-        if (value !== null) break;
-      }
-    }
-  }
-  // Annual-price fallback: convert to unit price using fixed profile from URL params.
-  if (value === null) {
-    const annualPatterns = [
-      /([0-9]{2,5}(?:[.,][0-9]{1,2})?)\s*(?:€|EUR)?\s*(?:per\s*jaar|\/\s*jaar|p\/j)/ig,
-      /(?:jaarprijs|jaarkosten|annual)[^0-9]{0,12}([0-9]{2,5}(?:[.,][0-9]{1,2})?)/ig,
-    ];
-    const annualVals = [];
-    for (const re of annualPatterns) {
-      let m;
-      while ((m = re.exec(html))) {
-        const n = toNumber(m[1]);
-        if (n !== null) annualVals.push(n);
-      }
-    }
-    const annual = annualVals.filter((n) => n > 50 && n < 10000).sort((a, b) => a - b)[0];
-    if (annual) {
-      value = annual / usage;
+  for (const re of htmlPatterns) {
+    let m;
+    while ((m = re.exec(html))) {
+      const num = m[2] && (m[1].toLowerCase() === targetUnit || m[1].toLowerCase() === 'm³') ? m[2] : m[1];
+      const unitHint = m[3] || m[1] || targetUnit;
+      const ctx = html.slice(Math.max(0, m.index - 40), Math.min(html.length, m.index + 120));
+      const c = normalizeCommodityPrice(num, unitHint, '', ctx);
+      if (c !== null) candidates.push({ value: c, src: null });
     }
   }
 
-  if (value === null) throw new Error('Could not parse Gaslicht cheapest price');
+  if (candidates.length) {
+    const min = candidates.sort((a, b) => a.value - b.value)[0];
+    const pkg = String(min?.src?.PackageUrl || '');
+    const src = pkg.startsWith('/') ? `https://www.gaslicht.com${pkg}` : sourceUrl;
+    return {
+      id: isGas ? 'gaslichtGas' : 'gaslichtElectricity',
+      label: isGas ? 'Cheapest Gas Provider (Gaslicht)' : 'Cheapest Electricity Provider (Gaslicht)',
+      value: min.value,
+      unit,
+      source: 'Gaslicht',
+      sourceUrl: src,
+      updatedAt: new Date().toISOString(),
+      detail: 'Laagste commodity-prijs uit prijsdetails (per eenheid)',
+    };
+  }
 
-  return {
-    id: isGas ? 'gaslichtGas' : 'gaslichtElectricity',
-    label: isGas ? 'Cheapest Gas Provider (Gaslicht)' : 'Cheapest Electricity Provider (Gaslicht)',
-    value,
-    unit,
-    source: 'Gaslicht',
-    sourceUrl,
-    updatedAt: new Date().toISOString(),
-    detail: 'Indicatie van goedkoopste vaste tariefresultaat',
-  };
+  throw new Error('Could not parse Gaslicht commodity unit price');
 }
 
 async function getGaslichtCheapestElectricity() {
@@ -1536,10 +1482,7 @@ async function collectOverview() {
   ];
 
   // Keep the same card layout for remaining Gaslicht cards that are not migrated yet.
-  const staticFallbacks = [
-    { id: 'gaslichtLongestContract', label: 'Langste Contractduur (Gaslicht)', value: null, unit: 'jaar', source: 'Gaslicht', sourceUrl: 'https://www.gaslicht.com/energievergelijken/', updatedAt: new Date().toISOString(), detail: 'Deze scraper is nog niet omgezet naar JavaScript backend' },
-    { id: 'gaslichtLongestContractElectricity', label: 'Langste Contractduur Stroom', value: null, unit: 'jaar', source: 'Gaslicht', sourceUrl: 'https://www.gaslicht.com/stroom-vergelijken/resultaten?showonlyswitchable=False&contracttype=Vast&stroomhoogverbruik=1000&stroomlaagverbruik=1000', updatedAt: new Date().toISOString(), detail: 'Deze scraper is nog niet omgezet naar JavaScript backend' },
-  ];
+  const staticFallbacks = [];
 
   for (const [fn, fb] of tasks) {
     try {
