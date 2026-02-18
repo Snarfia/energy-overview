@@ -1420,6 +1420,27 @@ async function getOverstappenReference(kind) {
   const unit = isGas ? 'EUR/m3' : 'EUR/kWh';
   const unitToken = isGas ? '(?:m3|m³)' : 'kwh';
 
+  if (!isGas) {
+    const directRow = html.match(/(Vast|Dynamisch)\s*([0-9]{1,2}\s*(?:jaar|maand))?[\s\S]{0,120}?€\s*([0-9]+(?:[.,][0-9]{2,4})?)/i);
+    if (directRow) {
+      const contractType = String(directRow[1] || '').trim();
+      const period = String(directRow[2] || '').trim();
+      const value = toNumber(directRow[3]);
+      if (value !== null && value > 0 && value < 2) {
+        return {
+          id: 'gaslichtElectricity',
+          label: 'Stroom referentieprijs (Overstappen.nl)',
+          value,
+          unit,
+          source: 'Overstappen.nl',
+          sourceUrl: url,
+          updatedAt: new Date().toISOString(),
+          detail: `Contract: ${contractType}${period ? ` ${period}` : ''} | De laagste prijs voor elektriciteit, inclusief belastingen, voor huishoudens`,
+        };
+      }
+    }
+  }
+
   const pricePatterns = [
     new RegExp(`€\\s*([0-9]+(?:[.,][0-9]{2,4})?)\\s*(?:per|/)\\s*${unitToken}`, 'ig'),
     new RegExp(`([0-9]+(?:[.,][0-9]{2,4})?)\\s*(?:€|eur)?\\s*(?:per|/)\\s*${unitToken}`, 'ig'),
@@ -1479,7 +1500,9 @@ async function getOverstappenReference(kind) {
     source: 'Overstappen.nl',
     sourceUrl: url,
     updatedAt: new Date().toISOString(),
-    detail: `Aanbieder: ${provider} | Contract: ${contract} | ${OVERSTAPPEN_DISCLAIMER}`,
+    detail: isGas
+      ? `Aanbieder: ${provider} | Contract: ${contract} | ${OVERSTAPPEN_DISCLAIMER}`
+      : `Aanbieder: ${provider} | Contract: ${contract} | De laagste prijs voor elektriciteit, inclusief belastingen, voor huishoudens`,
   };
 }
 
