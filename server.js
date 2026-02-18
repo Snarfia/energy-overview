@@ -1296,18 +1296,21 @@ async function getNlGasConsumptionBreakdownFallbackEntsog() {
   const dayRows = rows.filter((r) => String(r.periodFrom || '') === latestTs && String(r.directionKey || '').toLowerCase() === 'exit');
   if (!dayRows.length) throw new Error('No ENTSOG exit rows for fallback consumption');
 
-  let hh = 0;
-  let ind = 0;
-  let power = 0;
-  for (const r of dayRows) {
-    const lbl = String(r.pointLabel || '').toLowerCase();
-    const v = entsogGwhDay(r.value, r.unit) || 0;
-    if (lbl.includes('local distribution') || lbl.includes('dso') || lbl.includes('ldc')) hh += v;
-    else if (lbl.includes('power') || lbl.includes('electric') || lbl.includes('centrale')) power += v;
-    else if (lbl.includes('industry') || lbl.includes('industrial') || lbl.includes('consumer')) ind += v;
-    else ind += v;
-  }
-  const total = hh + ind + power;
+  const isDomesticConsumptionExit = (label) => {
+    const lbl = String(label || '').toLowerCase();
+    return (
+      lbl.includes('local distribution') ||
+      lbl.includes('dso') ||
+      lbl.includes('ldc') ||
+      lbl.includes('consumer') ||
+      lbl.includes('power') ||
+      lbl.includes('electric') ||
+      lbl.includes('centrale')
+    );
+  };
+
+  const domesticRows = dayRows.filter((r) => isDomesticConsumptionExit(r.pointLabel));
+  const total = domesticRows.reduce((s, r) => s + (entsogGwhDay(r.value, r.unit) || 0), 0);
   if (!(total > 0)) throw new Error('ENTSOG fallback consumption total is empty');
   return {
     id: 'nlGasConsumptionBreakdown',
@@ -1317,7 +1320,7 @@ async function getNlGasConsumptionBreakdownFallbackEntsog() {
     source: 'ENTSOG API (fallback)',
     sourceUrl,
     updatedAt: parseIsoUtc(latestTs)?.toISOString() || new Date().toISOString(),
-    detail: 'NED tijdelijk niet beschikbaar; totaal op basis van ENTSOG laatste volledige dag',
+    detail: 'NED tijdelijk niet beschikbaar; ENTSOG exits gefilterd op local distribution/consumers/power plants',
     rows: [],
   };
 }
