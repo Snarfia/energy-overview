@@ -20,7 +20,6 @@ const ENTSOG_BASE = 'https://transparency.entsog.eu/api/v1';
 const ENTSOG_NL_OPERATOR = 'NL-TSO-0001';
 const OVERSTAPPEN_GAS_URL = 'https://www.overstappen.nl/energie/gasprijzen/';
 const OVERSTAPPEN_POWER_URL = 'https://www.overstappen.nl/energie/stroomprijs/';
-const OVERSTAPPEN_DISCLAIMER = 'De getoonde tarieven (inclusief energiebelasting en btw, kortingen en contractvoorwaarden) komen rechtstreeks van de energieleveranciers.';
 
 function toNumber(value) {
   if (value === null || value === undefined) return null;
@@ -1419,48 +1418,40 @@ async function getOverstappenReference(kind) {
   const html = await fetchText(url, {}, 15000);
   const unit = isGas ? 'EUR/m3' : 'EUR/kWh';
   const unitToken = isGas ? '(?:m3|m³)' : 'kwh';
+  const pageText = htmlDecode(
+    html
+      .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+      .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/\s+/g, ' ')
+  );
 
-  if (isGas) {
-    const directRow = html.match(/([A-Z][A-Za-z0-9&'’\-\s]{2,40})\s*(Vast|Dynamisch)\s*([0-9]{1,2}\s*(?:jaar|maand))?[\s\S]{0,120}?€\s*([0-9]+(?:[.,][0-9]{2,4})?)/i);
-    if (directRow) {
-      const provider = String(directRow[1] || '').trim();
-      const contractType = String(directRow[2] || '').trim();
-      const period = String(directRow[3] || '').trim();
-      const value = toNumber(directRow[4]);
-      if (value !== null && value > 0 && value < 5) {
-        return {
-          id: 'gaslichtGas',
-          label: 'Gas referentieprijs (Overstappen.nl)',
-          value,
-          unit,
-          source: 'Overstappen.nl',
-          sourceUrl: url,
-          updatedAt: new Date().toISOString(),
-          detail: `Aanbieder: ${provider} | Contract: ${contractType}${period ? ` ${period}` : ''} | De laagste prijs voor aardgas, inclusief belastingen, voor huishoudens`,
-        };
-      }
-    }
-  }
-
-  if (!isGas) {
-    const directRow = html.match(/(Vast|Dynamisch)\s*([0-9]{1,2}\s*(?:jaar|maand))?[\s\S]{0,120}?€\s*([0-9]+(?:[.,][0-9]{2,4})?)/i);
-    if (directRow) {
-      const contractType = String(directRow[1] || '').trim();
-      const period = String(directRow[2] || '').trim();
-      const value = toNumber(directRow[3]);
-      if (value !== null && value > 0 && value < 2) {
-        return {
-          id: 'gaslichtElectricity',
-          label: 'Stroom referentieprijs (Overstappen.nl)',
-          value,
-          unit,
-          source: 'Overstappen.nl',
-          sourceUrl: url,
-          updatedAt: new Date().toISOString(),
-          detail: `Contract: ${contractType}${period ? ` ${period}` : ''} | De laagste prijs voor elektriciteit, inclusief belastingen, voor huishoudens`,
-        };
-      }
-    }
+  const topRowPatterns = [
+    /(?:^|\s)1\s*[.)-]?\s*([A-Z][A-Za-z0-9&'’\-\s]{2,40})\s+(Vast|Dynamisch)\s+([0-9]{1,2}\s*(?:jaar|maand))\s+€\s*([0-9]+(?:[.,][0-9]{2,4})?)/i,
+    /([A-Z][A-Za-z0-9&'’\-\s]{2,40})\s+(Vast|Dynamisch)\s+([0-9]{1,2}\s*(?:jaar|maand))\s+€\s*([0-9]+(?:[.,][0-9]{2,4})?)/i,
+  ];
+  for (const re of topRowPatterns) {
+    const m = pageText.match(re);
+    if (!m) continue;
+    const provider = String(m[1] || '').trim().replace(/\s{2,}/g, ' ');
+    const contractType = String(m[2] || '').trim();
+    const period = String(m[3] || '').trim();
+    const value = toNumber(m[4]);
+    if (!provider || provider.length < 3 || value === null) continue;
+    if (isGas && (value <= 0.2 || value >= 5)) continue;
+    if (!isGas && (value <= 0.03 || value >= 2)) continue;
+    return {
+      id: isGas ? 'gaslichtGas' : 'gaslichtElectricity',
+      label: isGas ? 'Gas referentieprijs (Overstappen.nl)' : 'Stroom referentieprijs (Overstappen.nl)',
+      value,
+      unit,
+      source: 'Overstappen.nl',
+      sourceUrl: url,
+      updatedAt: new Date().toISOString(),
+      detail: isGas
+        ? `Aanbieder: ${provider} | Contract: ${contractType} ${period} | De laagste prijs voor aardgas, inclusief belastingen, voor huishoudens`
+        : `Aanbieder: ${provider} | Contract: ${contractType} ${period} | De laagste prijs voor elektriciteit, inclusief belastingen, voor huishoudens`,
+    };
   }
 
   const pricePatterns = [
@@ -1523,7 +1514,7 @@ async function getOverstappenReference(kind) {
     sourceUrl: url,
     updatedAt: new Date().toISOString(),
     detail: isGas
-      ? `Aanbieder: ${provider} | Contract: ${contract} | ${OVERSTAPPEN_DISCLAIMER}`
+      ? `Aanbieder: ${provider} | Contract: ${contract} | De laagste prijs voor aardgas, inclusief belastingen, voor huishoudens`
       : `Aanbieder: ${provider} | Contract: ${contract} | De laagste prijs voor elektriciteit, inclusief belastingen, voor huishoudens`,
   };
 }
