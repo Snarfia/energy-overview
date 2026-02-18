@@ -1035,12 +1035,25 @@ async function getNlGasImport() {
   const normalizeCountryCode = (raw, pointLabel = '') => {
     const txt = String(raw || '').trim().toUpperCase();
     const lbl = String(pointLabel || '').toUpperCase();
-    const all = `${txt} ${lbl}`;
-    if (['BE', 'BEL', 'BELGIUM', 'BELGIE'].some((k) => all.includes(k))) return 'BE';
-    if (['DE', 'DEU', 'GERMANY', 'DUITSLAND'].some((k) => all.includes(k))) return 'DE';
-    if (['GB', 'UK', 'GBR', 'UNITED KINGDOM', 'VERENIGD KONINKRIJK'].some((k) => all.includes(k))) return 'GB';
-    if (['DK', 'DNK', 'DENMARK', 'DENEMARKEN', 'DANMARK'].some((k) => all.includes(k))) return 'DK';
-    if (['NO', 'NOR', 'NORWAY', 'NOORWEGEN'].some((k) => all.includes(k))) return 'NO';
+    const normalizedLabel = lbl.replace(/[^A-Z0-9]+/g, ' ').trim();
+    const words = new Set(normalizedLabel ? normalizedLabel.split(/\s+/) : []);
+
+    const exactRaw = {
+      BE: 'BE', BEL: 'BE', BELGIUM: 'BE', BELGIE: 'BE',
+      DE: 'DE', DEU: 'DE', GERMANY: 'DE', DUITSLAND: 'DE',
+      GB: 'GB', UK: 'GB', GBR: 'GB', 'UNITED KINGDOM': 'GB', 'VERENIGD KONINKRIJK': 'GB',
+      DK: 'DK', DNK: 'DK', DENMARK: 'DK', DENEMARKEN: 'DK', DANMARK: 'DK',
+      NO: 'NO', NOR: 'NO', NORWAY: 'NO', NOORWEGEN: 'NO',
+    };
+    if (exactRaw[txt]) return exactRaw[txt];
+
+    const hasPhrase = (phrase) => normalizedLabel.includes(phrase);
+    if (words.has('BELGIUM') || words.has('BELGIE')) return 'BE';
+    if (words.has('GERMANY') || words.has('DUITSLAND')) return 'DE';
+    if (words.has('DENMARK') || words.has('DENEMARKEN') || words.has('DANMARK')) return 'DK';
+    if (words.has('NORWAY') || words.has('NOORWEGEN')) return 'NO';
+    if (hasPhrase('UNITED KINGDOM') || hasPhrase('VERENIGD KONINKRIJK')) return 'GB';
+
     return '';
   };
 
