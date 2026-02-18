@@ -1032,13 +1032,26 @@ async function getNlGasImport() {
   const latestTs = pickLatestCompleteGasDayTs(flowRows) || flowRows.map((r) => String(r.periodFrom || '')).filter(Boolean).sort().at(-1);
   const rowsAtTs = flowRows.filter((r) => String(r.periodFrom || '') === latestTs);
 
+  const normalizeCountryCode = (raw, pointLabel = '') => {
+    const txt = String(raw || '').trim().toUpperCase();
+    const lbl = String(pointLabel || '').toUpperCase();
+    const all = `${txt} ${lbl}`;
+    if (['BE', 'BEL', 'BELGIUM', 'BELGIE'].some((k) => all.includes(k))) return 'BE';
+    if (['DE', 'DEU', 'GERMANY', 'DUITSLAND'].some((k) => all.includes(k))) return 'DE';
+    if (['GB', 'UK', 'GBR', 'UNITED KINGDOM', 'VERENIGD KONINKRIJK'].some((k) => all.includes(k))) return 'GB';
+    if (['DK', 'DNK', 'DENMARK', 'DENEMARKEN', 'DANMARK'].some((k) => all.includes(k))) return 'DK';
+    if (['NO', 'NOR', 'NORWAY', 'NOORWEGEN'].some((k) => all.includes(k))) return 'NO';
+    return '';
+  };
+
   const countryMap = new Map();
+  let otherCrossBorderNet = 0;
   let lng = 0;
   let storage = 0;
   for (const r of rowsAtTs) {
     const m = meta.get(String(r.pointKey || '')) || {};
     const pointType = String(m.pointType || '');
-    const country = String(m.adjacentCountry || m.adjacentCountryCode || r.adjacentCountry || '');
+    const rawCountry = String(m.adjacentCountry || m.adjacentCountryCode || r.adjacentCountry || '');
     const label = String(m.pointLabel || '').toLowerCase();
     const direction = String(r.directionKey || '').toLowerCase();
     const val = entsogGwhDay(r.value, r.unit);
@@ -1049,7 +1062,13 @@ async function getNlGasImport() {
       storage += direction === 'entry' ? val : -val;
     }
 
-    if (!pointType.includes('Cross-Border Transmission') || !country || country === 'NL') continue;
+    if (!pointType.includes('Cross-Border Transmission')) continue;
+    const country = normalizeCountryCode(rawCountry, m.pointLabel || r.pointLabel || '');
+    if (!country || country === 'NL') {
+      if (direction === 'entry') otherCrossBorderNet += val;
+      if (direction === 'exit') otherCrossBorderNet -= val;
+      continue;
+    }
     const bucket = countryMap.get(country) || { in: 0, out: 0 };
     if (direction === 'entry') bucket.in += val;
     if (direction === 'exit') bucket.out += val;
@@ -1069,6 +1088,9 @@ async function getNlGasImport() {
   });
   rows.push({ hour: 'LNG (Gate+EET)', value: lng, unit: 'GWh/d' });
   rows.push({ hour: 'Gasopslag (4 sites)', value: storage, unit: 'GWh/d' });
+  if (Math.abs(otherCrossBorderNet) > 0.0001) {
+    rows.push({ hour: 'Overig (onbekend land)', value: otherCrossBorderNet, unit: 'GWh/d' });
+  }
   let productionValue = null;
   try {
     const prod = await getNlGasProduction();
@@ -1106,6 +1128,7 @@ async function getNlGasImport() {
     }
   }
 
+  const unknownNote = Math.abs(otherCrossBorderNet) > 0.0001 ? ` | overig/onbekend land: ${Number(otherCrossBorderNet).toFixed(1)} GWh/d` : '';
   return {
     id: 'nlGasImport',
     label: 'Netto in- en uitstroom aardgas',
@@ -1114,7 +1137,7 @@ async function getNlGasImport() {
     source: 'ENTSOG API',
     sourceUrl,
     updatedAt: parseIsoUtc(latestTs)?.toISOString() || new Date().toISOString(),
-    detail: 'Positief = netto instroom, negatief = netto uitstroom',
+    detail: `Positief = netto instroom, negatief = netto uitstroom${unknownNote}`,
     rows,
   };
 }
