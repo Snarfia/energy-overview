@@ -223,7 +223,7 @@ function createCrossBorderFlowMap(rows, unitLabel = "MW", mode = "electricity") 
   const formatFlowLabel = (value) => {
     if (!Number.isFinite(value)) return "n/a";
     if (mode === "electricity") return `${(value / 1000).toFixed(1)} GW`;
-    return `${formatNumber(value)} ${unitLabel}`;
+    return `${formatNumber(value)}`;
   };
   const ribbonPath = (x1, y1, x2, y2, w) => {
     const dx = x2 - x1;

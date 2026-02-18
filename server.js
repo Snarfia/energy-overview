@@ -202,6 +202,11 @@ function loadPreviousOverviewMap() {
   }
 }
 
+function getPreviousItemById(id) {
+  const m = loadPreviousOverviewMap();
+  return m.get(String(id)) || null;
+}
+
 function hasUsefulValue(item) {
   if (!item || typeof item !== 'object') return false;
   if (item.value !== null && item.value !== undefined) return true;
@@ -1066,7 +1071,21 @@ async function getNlGasImport() {
     rows[1].value = net; // place fallback net on DE anchor to keep map readable
   }
 
-  const total = rows.reduce((s, r) => s + (r.value || 0), 0);
+  let total = rows.reduce((s, r) => s + (r.value || 0), 0);
+
+  const hasAnyCountry = rows.slice(0, 5).some((r) => r.value !== null && Math.abs(Number(r.value)) > 0.0001);
+  if (!hasAnyCountry || Math.abs(total) < 0.0001) {
+    const prev = getPreviousItemById('nlGasImport');
+    const prevTotal = toNumber(prev?.value);
+    if (prev && prevTotal !== null && Math.abs(prevTotal) > 0.0001) {
+      return {
+        ...prev,
+        detail: `${String(prev.detail || 'Positief = netto import naar NL, negatief = netto export uit NL')} | tijdelijke bronstoring, laatste niet-nul waarde getoond`,
+        updatedAt: new Date().toISOString(),
+      };
+    }
+  }
+
   return {
     id: 'nlGasImport',
     label: 'Gas Cross-Border Flows NL (per land, netto)',
@@ -1246,8 +1265,8 @@ async function getNlGasConsumptionBreakdown() {
     source: 'NED API',
     sourceUrl,
     updatedAt: totals.map((t) => t[2]).sort().at(-1) || new Date().toISOString(),
-    detail: 'Onderverdeling hieronder in percentages',
-    rows,
+    detail: 'Totaal gasverbruik laatste volledige dag',
+    rows: [],
   };
 }
 
@@ -1278,21 +1297,37 @@ async function getNlGasConsumptionBreakdownFallbackEntsog() {
     source: 'ENTSOG API (fallback)',
     sourceUrl,
     updatedAt: parseIsoUtc(latestTs)?.toISOString() || new Date().toISOString(),
-    detail: 'NED tijdelijk niet beschikbaar; onderverdeling op ENTSOG exit-categorieen',
-    rows: [
-      { hour: 'Huishoudens & kleinzakelijk', value: (hh / total) * 100, unit: '%' },
-      { hour: 'Industrie', value: (ind / total) * 100, unit: '%' },
-      { hour: 'Gascentrales', value: (power / total) * 100, unit: '%' },
-    ],
+    detail: 'NED tijdelijk niet beschikbaar; totaal op basis van ENTSOG laatste volledige dag',
+    rows: [],
   };
 }
 
 async function getGaslichtCheapest(kind) {
   const isGas = kind === 'gas';
-  const sourceUrl = isGas
-    ? 'https://www.gaslicht.com/gas-vergelijken/resultaten?showonlyswitchable=False&contracttype=Vast&gasverbruik=1000'
-    : 'https://www.gaslicht.com/stroom-vergelijken/resultaten?showonlyswitchable=False&contracttype=Vast&stroomhoogverbruik=1000&stroomlaagverbruik=1000';
-  const html = await fetchText(sourceUrl, {}, 15000);
+  const candidateUrls = isGas
+    ? [
+        'https://www.gaslicht.com/gas-vergelijken/resultaten?showonlyswitchable=False&contracttype=Vast&gasverbruik=1000',
+        'https://www.gaslicht.com/gas-vergelijken/resultaten?showonlyswitchable=False&gasverbruik=1000',
+        'https://www.gaslicht.com/gas-vergelijken/',
+      ]
+    : [
+        'https://www.gaslicht.com/stroom-vergelijken/resultaten?showonlyswitchable=False&contracttype=Vast&stroomhoogverbruik=1000&stroomlaagverbruik=1000',
+        'https://www.gaslicht.com/stroom-vergelijken/resultaten?showonlyswitchable=False&stroomhoogverbruik=1000&stroomlaagverbruik=1000',
+        'https://www.gaslicht.com/stroom-vergelijken/',
+      ];
+  let html = '';
+  let sourceUrl = candidateUrls[0];
+  let lastFetchErr = null;
+  for (const url of candidateUrls) {
+    try {
+      html = await fetchText(url, {}, 15000);
+      sourceUrl = url;
+      if (html && html.length > 500) break;
+    } catch (err) {
+      lastFetchErr = err;
+    }
+  }
+  if (!html) throw new Error(`Could not load Gaslicht results (${String(lastFetchErr?.message || lastFetchErr || 'empty response')})`);
   const unit = isGas ? 'EUR/m3' : 'EUR/kWh';
   const usage = isGas ? 1000 : 2000;
 
