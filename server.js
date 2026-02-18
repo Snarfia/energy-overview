@@ -1066,6 +1066,14 @@ async function getNlGasImport() {
   });
   rows.push({ hour: 'LNG (Gate+EET)', value: lng, unit: 'GWh/d' });
   rows.push({ hour: 'Gasopslag (4 sites)', value: storage, unit: 'GWh/d' });
+  let productionValue = null;
+  try {
+    const prod = await getNlGasProduction();
+    productionValue = toNumber(prod?.value);
+  } catch {
+    productionValue = null;
+  }
+  rows.push({ hour: 'Nationale productie', value: productionValue, unit: 'GWh/d' });
 
   // If country codes are missing in ENTSOG metadata, still show a useful net value.
   if (rows.slice(0, 5).every((r) => r.value === null)) {
@@ -1097,13 +1105,13 @@ async function getNlGasImport() {
 
   return {
     id: 'nlGasImport',
-    label: 'Gas Cross-Border Flows NL (per land, netto)',
+    label: 'Netto in- en uitstroom aardgas',
     value: total,
     unit: 'GWh/d',
     source: 'ENTSOG API',
     sourceUrl,
     updatedAt: parseIsoUtc(latestTs)?.toISOString() || new Date().toISOString(),
-    detail: 'Positief = netto import naar NL, negatief = netto export uit NL',
+    detail: 'Positief = netto instroom, negatief = netto uitstroom',
     rows,
   };
 }
@@ -1546,7 +1554,7 @@ async function collectOverview() {
     [getTTFGas, { id: 'ttfGas', label: 'TTF Gas', value: null, unit: 'EUR/MWh', source: 'TradingEconomics', sourceUrl: 'https://tradingeconomics.com/commodity/eu-natural-gas', updatedAt: new Date().toISOString(), detail: 'Bron tijdelijk niet bereikbaar' }],
     [getETSPrice, { id: 'ets', label: 'EU ETS (ICE EUA Futures)', value: null, unit: 'EUR/tCO2', source: 'Barchart', sourceUrl: 'https://www.barchart.com/futures/quotes/CKJ26', updatedAt: new Date().toISOString(), detail: 'Bron tijdelijk niet bereikbaar' }],
     [getGenerationMixShare, { id: 'nlGenerationMixShare', label: 'Opwek Mix NL (actuele verhouding)', value: null, unit: '', valueText: 'Verhouding per bron', source: 'ENTSO-E Transparency API', sourceUrl: ENTSOE_BASE, updatedAt: new Date().toISOString(), detail: 'Bron tijdelijk niet bereikbaar', rows: [] }],
-    [getNlGasImport, { id: 'nlGasImport', label: 'Gas Cross-Border Flows NL (per land, netto)', value: null, unit: 'GWh/d', source: 'ENTSOG API', sourceUrl: ENTSOG_BASE, updatedAt: new Date().toISOString(), detail: 'Bron tijdelijk niet bereikbaar', rows: [{ hour: 'Belgie', value: null, unit: 'GWh/d' }, { hour: 'Duitsland', value: null, unit: 'GWh/d' }, { hour: 'Verenigd Koninkrijk', value: null, unit: 'GWh/d' }, { hour: 'Denemarken', value: null, unit: 'GWh/d' }, { hour: 'Noorwegen', value: null, unit: 'GWh/d' }, { hour: 'LNG (Gate+EET)', value: null, unit: 'GWh/d' }, { hour: 'Gasopslag (4 sites)', value: null, unit: 'GWh/d' }] }],
+    [getNlGasImport, { id: 'nlGasImport', label: 'Netto in- en uitstroom aardgas', value: null, unit: 'GWh/d', source: 'ENTSOG API', sourceUrl: ENTSOG_BASE, updatedAt: new Date().toISOString(), detail: 'Bron tijdelijk niet bereikbaar', rows: [{ hour: 'Belgie', value: null, unit: 'GWh/d' }, { hour: 'Duitsland', value: null, unit: 'GWh/d' }, { hour: 'Verenigd Koninkrijk', value: null, unit: 'GWh/d' }, { hour: 'Denemarken', value: null, unit: 'GWh/d' }, { hour: 'Noorwegen', value: null, unit: 'GWh/d' }, { hour: 'LNG (Gate+EET)', value: null, unit: 'GWh/d' }, { hour: 'Gasopslag (4 sites)', value: null, unit: 'GWh/d' }, { hour: 'Nationale productie', value: null, unit: 'GWh/d' }] }],
     [getNlGasProduction, { id: 'nlGasProduction', label: 'Gaswinning NL (laatste dag)', value: null, unit: 'GWh/d', source: 'ENTSOG API', sourceUrl: ENTSOG_BASE, updatedAt: new Date().toISOString(), detail: 'Bron tijdelijk niet bereikbaar' }],
     [getEntsoeCrossBorderFlows, { id: 'nlCrossBorderFlows', label: 'Cross-Border Physical Flows NL (live, netto)', value: null, unit: 'MW', source: 'ENTSO-E Transparency API', sourceUrl: ENTSOE_BASE, updatedAt: new Date().toISOString(), detail: 'Bron tijdelijk niet bereikbaar', rows: [{ hour: 'Belgie', value: null, unit: 'MW' }, { hour: 'Duitsland', value: null, unit: 'MW' }, { hour: 'Verenigd Koninkrijk', value: null, unit: 'MW' }, { hour: 'Denemarken', value: null, unit: 'MW' }, { hour: 'Noorwegen', value: null, unit: 'MW' }] }],
     [getNlGasStorage, { id: 'nlGasStorage', label: 'NL Gasopslag (actueel)', value: null, unit: '%', source: 'NED API', sourceUrl: 'https://api.ned.nl/v1/utilizations', updatedAt: new Date().toISOString(), detail: 'Bron tijdelijk niet bereikbaar' }],
