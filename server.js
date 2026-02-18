@@ -380,10 +380,13 @@ async function getEntsoeGenerationMixShare() {
   const fmt = (d) => `${d.getUTCFullYear()}${String(d.getUTCMonth() + 1).padStart(2, '0')}${String(d.getUTCDate()).padStart(2, '0')}${String(d.getUTCHours()).padStart(2, '0')}${String(d.getUTCMinutes()).padStart(2, '0')}`;
   const attempts = [
     { documentType: 'A75', processType: 'A16', in_Domain: '10YNL----------L' },
+    { documentType: 'A75', processType: 'A01', in_Domain: '10YNL----------L' },
     { documentType: 'A75', processType: 'A16', In_Domain: '10YNL----------L' },
     { documentType: 'A75', in_Domain: '10YNL----------L' },
     { documentType: 'A75', biddingZone_Domain: '10YNL----------L' },
     { documentType: 'A75', BiddingZone_Domain: '10YNL----------L' },
+    { documentType: 'A75', processType: 'A16', outBiddingZone_Domain: '10YNL----------L' },
+    { documentType: 'A75', processType: 'A16', inBiddingZone_Domain: '10YNL----------L' },
   ];
 
   let byCode = new Map();
@@ -462,6 +465,55 @@ function nedValueToMw(rec) {
   if (unit.includes('kw')) return raw / 1000;
   if (unit.includes('%')) return null;
   return raw > 20000 ? raw / 1000 : raw;
+}
+
+function mixLabelFromText(text) {
+  const k = String(text || '').toLowerCase();
+  if (k.includes('gas') || k.includes('aardgas') || k.includes('ccgt')) return 'Gascentrales';
+  if (k.includes('kool') || k.includes('coal') || k.includes('lignite')) return 'Kolencentrales';
+  if (k.includes('afval') || k.includes('waste')) return 'Afval';
+  if (k.includes('zon') || k.includes('solar') || k.includes('pv')) return 'Zon';
+  if (k.includes('wind') || k.includes('offshore') || k.includes('onshore')) return 'Wind';
+  if (k.includes('biomass') || k.includes('biomassa') || k.includes('biogas')) return 'Biomassa';
+  if (k.includes('kern') || k.includes('nuclear')) return 'Kernenergie';
+  return null;
+}
+
+function extractMixSumsFromObject(payload) {
+  const sums = {
+    Gascentrales: 0,
+    Kolencentrales: 0,
+    Afval: 0,
+    Zon: 0,
+    Wind: 0,
+    Biomassa: 0,
+    Kernenergie: 0,
+  };
+
+  function walk(node, path = []) {
+    if (Array.isArray(node)) {
+      for (let i = 0; i < node.length; i += 1) walk(node[i], [...path, String(i)]);
+      return;
+    }
+    if (!node || typeof node !== 'object') return;
+    for (const [key, value] of Object.entries(node)) {
+      const nextPath = [...path, key];
+      if (value && typeof value === 'object') {
+        walk(value, nextPath);
+        continue;
+      }
+      const n = toNumber(value);
+      if (n === null || !Number.isFinite(n) || n <= 0 || n > 1_000_000) continue;
+      const blob = nextPath.join(' ').toLowerCase();
+      const label = mixLabelFromText(blob);
+      if (!label) continue;
+      if (blob.includes('percentage') || blob.includes('share') || blob.includes('%')) continue;
+      sums[label] += n;
+    }
+  }
+
+  walk(payload, []);
+  return sums;
 }
 
 async function getNedGenerationMixShare() {
@@ -621,7 +673,11 @@ async function getNedGenerationMixShareFromUtilizations() {
 async function getNedGenerationMixShareFromDataportaal() {
   const pageUrl = 'https://ned.nl/nl/dataportaal/energie-productie/elektriciteit/totale-elektriciteitsproductie';
   const pageHtml = await fetchText(pageUrl, {}, 15000);
-  const candidates = new Set(['totale-elektriciteitsproductie', 'elektriciteitsproductie']);
+  const candidates = new Set([
+    'totale-elektriciteitsproductie',
+    'elektriciteitsproductie',
+    'elektriciteitsproductie-totaal',
+  ]);
 
   const patterns = [
     /grafiek\/data\/([a-z0-9-]+)\/current/gi,
@@ -655,22 +711,10 @@ async function getNedGenerationMixShareFromDataportaal() {
         Kernenergie: 0,
       };
 
-      const mapLabel = (name) => {
-        const k = String(name || '').toLowerCase();
-        if (k.includes('gas')) return 'Gascentrales';
-        if (k.includes('kool') || k.includes('coal')) return 'Kolencentrales';
-        if (k.includes('afval')) return 'Afval';
-        if (k.includes('zon') || k.includes('solar') || k.includes('pv')) return 'Zon';
-        if (k.includes('wind')) return 'Wind';
-        if (k.includes('biomass')) return 'Biomassa';
-        if (k.includes('kern') || k.includes('nuclear')) return 'Kernenergie';
-        return null;
-      };
-
       // wide style
       for (const [key, value] of Object.entries(latest)) {
         if (['datum', 'date', 'time', 'timestamp', 'validfrom', 'total', 'totaal'].includes(String(key).toLowerCase())) continue;
-        const label = mapLabel(key);
+        const label = mixLabelFromText(key);
         const n = toNumber(value);
         if (!label || n === null || n <= 0) continue;
         sums[label] += n;
@@ -678,11 +722,16 @@ async function getNedGenerationMixShareFromDataportaal() {
       // narrow style fallback
       if (Object.values(sums).reduce((a, b) => a + b, 0) <= 0) {
         for (const row of rows) {
-          const label = mapLabel(row?.naam || row?.name || row?.label || row?.type || row?.bron);
+          const label = mixLabelFromText(row?.naam || row?.name || row?.label || row?.type || row?.bron);
           const n = toNumber(row?.value ?? row?.vermogen ?? row?.mw ?? row?.amount);
           if (!label || n === null || n <= 0) continue;
           sums[label] += n;
         }
+      }
+      // generic object walk fallback
+      if (Object.values(sums).reduce((a, b) => a + b, 0) <= 0) {
+        const generic = extractMixSumsFromObject(payload);
+        for (const [k, v] of Object.entries(generic)) sums[k] += v;
       }
 
       const total = Object.values(sums).reduce((a, b) => a + b, 0);
@@ -719,7 +768,7 @@ async function getGenerationMixShare() {
       try {
         return await getEntsoeGenerationMixShare();
       } catch {
-        return getNedGenerationMixShare();
+        return await getNedGenerationMixShare();
       }
     }
   }
@@ -1403,6 +1452,17 @@ async function getGaslichtCheapest(kind) {
       // skip invalid payload
     }
   }
+  if (!products.length) {
+    const encodedObjects = html.match(/\{&quot;PackageUrl&quot;:[\s\S]*?\}/g) || [];
+    for (const encoded of encodedObjects) {
+      try {
+        const parsed = JSON.parse(htmlDecode(encoded));
+        if (parsed && typeof parsed === 'object') products.push(parsed);
+      } catch {
+        // skip invalid payload
+      }
+    }
+  }
 
   const totalCostOf = (p) => {
     const totalKeys = ['PackageCosts', 'Price', 'PackageCost', 'TotalPrice', 'MonthlyCosts'];
@@ -1495,6 +1555,36 @@ async function getGaslichtCheapest(kind) {
         if (n !== null) prices.push({ value: n, ctx: payloadText.toLowerCase() });
       }
     }
+  }
+
+  if (!prices.length) {
+    // fallback: direct key-based extraction from cheapest contract payload
+    const directPriceKeys = isGas
+      ? ['gas', 'm3', 'm³', 'commodity', 'leveringstarief', 'allin', 'all-in', 'term', 'tarief', 'price']
+      : ['stroom', 'kwh', 'commodity', 'leveringstarief', 'allin', 'all-in', 'term', 'tarief', 'price'];
+    function walkDirect(obj, path = []) {
+      if (Array.isArray(obj)) {
+        for (let i = 0; i < obj.length; i += 1) walkDirect(obj[i], [...path, String(i)]);
+        return;
+      }
+      if (!obj || typeof obj !== 'object') return;
+      for (const [k, v] of Object.entries(obj)) {
+        const nextPath = [...path, k];
+        if (v && typeof v === 'object') {
+          walkDirect(v, nextPath);
+          continue;
+        }
+        const n = toNumber(v);
+        if (n === null) continue;
+        const blob = nextPath.join(' ').toLowerCase();
+        if (!directPriceKeys.some((kw) => blob.includes(kw))) continue;
+        if (['bonus', 'vastrecht', 'abonnement', 'total', 'packagecost', 'monthly', 'year', 'jaar'].some((kw) => blob.includes(kw))) continue;
+        let normalized = n > 10 ? n / 100 : n;
+        if (isGas && normalized >= 0.2 && normalized <= 5) prices.push({ value: normalized, ctx: blob });
+        if (!isGas && normalized >= 0.03 && normalized <= 2) prices.push({ value: normalized, ctx: blob });
+      }
+    }
+    walkDirect(cheapestProduct, []);
   }
 
   if (!prices.length) {
