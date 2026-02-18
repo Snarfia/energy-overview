@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-02-18T12:04:48.713Z",
-  "durationMs": 88673,
+  "generatedAt": "2026-02-18T12:24:25.498Z",
+  "durationMs": 69203,
   "items": [
     {
       "id": "dayAheadPower24h",
@@ -9,7 +9,7 @@
       "unit": "EUR/MWh",
       "source": "ENTSO-E Transparency API (EPEX SPOT NL)",
       "sourceUrl": "https://web-api.tp.entsoe.eu/api",
-      "updatedAt": "2026-02-18T12:03:22.881Z",
+      "updatedAt": "2026-02-18T12:23:17.131Z",
       "detail": "Komende 24 uur per uur",
       "rows": [
         {
@@ -141,7 +141,8 @@
       "unit": "EUR/MWh",
       "source": "TradingEconomics",
       "sourceUrl": "https://tradingeconomics.com/commodity/eu-natural-gas",
-      "updatedAt": "2026-02-18T12:03:23.130Z"
+      "updatedAt": "2026-02-18T12:23:20.163Z",
+      "detail": "tijdelijke bronstoring, laatste geldige waarde getoond | fout: HTTP 404 for https://markets.businessinsider.com/commodities/dutch-ttf-gas"
     },
     {
       "id": "ets",
@@ -160,7 +161,7 @@
       "valueText": "Verhouding per bron",
       "source": "ENTSO-E Transparency API",
       "sourceUrl": "https://web-api.tp.entsoe.eu/api",
-      "updatedAt": "2026-02-18T12:04:15.966Z",
+      "updatedAt": "2026-02-18T12:24:07.444Z",
       "detail": "Bron tijdelijk niet bereikbaar | fout: No generation mix values | tijdelijke bronstoring, laatste geldige waarde getoond | fout: No generation mix values | tijdelijke bronstoring, laatste geldige waarde getoond | fout: No generation mix values",
       "rows": []
     },
@@ -236,36 +237,36 @@
     {
       "id": "nlCrossBorderFlows",
       "label": "Cross-Border Physical Flows NL (live, netto)",
-      "value": 8072.7715,
+      "value": 8422.033647,
       "unit": "MW",
       "source": "ENTSO-E Transparency API",
       "sourceUrl": "https://web-api.tp.entsoe.eu/api",
-      "updatedAt": "2026-02-18T12:04:34.322Z",
+      "updatedAt": "2026-02-18T12:24:12.599Z",
       "detail": "Positief = netto import naar NL, negatief = netto export uit NL",
       "rows": [
         {
           "hour": "Belgie",
-          "value": 1158.2715,
+          "value": 1497.77425,
           "unit": "MW"
         },
         {
           "hour": "Duitsland",
-          "value": 5819.67,
+          "value": 5776.67337,
           "unit": "MW"
         },
         {
           "hour": "Verenigd Koninkrijk",
-          "value": -250.96,
+          "value": -167.39,
           "unit": "MW"
         },
         {
           "hour": "Denemarken",
-          "value": 697.42,
+          "value": 697.09,
           "unit": "MW"
         },
         {
           "hour": "Noorwegen",
-          "value": 648.37,
+          "value": 617.886027,
           "unit": "MW"
         }
       ]
@@ -277,7 +278,7 @@
       "unit": "%",
       "source": "NED Website",
       "sourceUrl": "https://ned.nl/nl/gasopslagen-nederland",
-      "updatedAt": "2026-02-18T12:04:34.805Z",
+      "updatedAt": "2026-02-18T12:24:13.056Z",
       "detail": "Actuele nationale vullingsgraad van NED",
       "rows": [
         {
@@ -290,11 +291,11 @@
     {
       "id": "nlElectricityOverview",
       "label": "Elektriciteit NL (actuele load)",
-      "value": 8750.873,
+      "value": 8193.237,
       "unit": "MW",
       "source": "ENTSO-E Transparency API",
       "sourceUrl": "https://web-api.tp.entsoe.eu/api",
-      "updatedAt": "2026-02-18T11:15:00.000Z",
+      "updatedAt": "2026-02-18T11:30:00.000Z",
       "detail": "Actuele load uit ENTSO-E",
       "rows": []
     },
@@ -305,7 +306,7 @@
       "unit": "Hz",
       "source": "mainsfrequency.com",
       "sourceUrl": "https://mainsfrequency.com/",
-      "updatedAt": "2026-02-18T12:04:37.637Z",
+      "updatedAt": "2026-02-18T12:24:14.137Z",
       "detail": "Doelwaarde rond 50 Hz"
     },
     {
@@ -322,12 +323,12 @@
     {
       "id": "tennetRegulation",
       "label": "TenneT Balance Delta (actueel, 12s)",
-      "value": 270,
+      "value": -27.299999999999997,
       "unit": "MW",
       "source": "TenneT API (Balance Delta High Res)",
       "sourceUrl": "https://api.tennet.eu/publications/v1/balance-delta-high-res/latest",
-      "updatedAt": "2026-02-18T12:02:36Z",
-      "detail": "In 0.0 MW | Out 270.0 MW"
+      "updatedAt": "2026-02-18T12:22:12Z",
+      "detail": "In 57.8 MW | Out 30.5 MW"
     },
     {
       "id": "tennetSettlement",
@@ -336,8 +337,8 @@
       "unit": "EUR/MWh",
       "source": "TenneT API (fallback via Balance Delta)",
       "sourceUrl": "https://api.tennet.eu/publications/v1/balance-delta-high-res/latest",
-      "updatedAt": "2026-02-18T12:02:36Z",
-      "detail": "Fallback | Mid 61.32 | Up n/a | Down 59.51"
+      "updatedAt": "2026-02-18T12:22:12Z",
+      "detail": "Fallback | Mid 61.32 | Up n/a | Down 80.9"
     },
     {
       "id": "gaslichtElectricity",
@@ -346,21 +347,25 @@
       "unit": "EUR/kWh",
       "source": "Gaslicht",
       "sourceUrl": "https://www.gaslicht.com/stroom-vergelijken/greenchoice/nl-groene-stroom-1-jr-vast-actie-5005",
-      "updatedAt": "2026-02-18T12:04:47.094Z",
+      "updatedAt": "2026-02-18T12:24:23.445Z",
       "detail": "Goedkoopste contract op totale kosten; commodity-prijs uit contractdetails (incl belastingen indien beschikbaar)"
     },
     {
       "id": "gaslichtGas",
       "label": "Cheapest Gas Provider (Gaslicht)",
-      "value": 2,
+      "value": null,
       "unit": "EUR/m3",
       "source": "Gaslicht",
       "sourceUrl": "https://www.gaslicht.com/gas-vergelijken/resultaten?showonlyswitchable=False&contracttype=Vast&gasverbruik=1000",
-      "updatedAt": "2026-02-18T12:04:48.712Z",
-      "detail": "Laagste commodity-prijs uit prijsdetails (per eenheid) | tijdelijke bronstoring, laatste geldige waarde getoond | fout: Could not parse commodity unit price from cheapest contract details"
+      "updatedAt": "2026-02-18T12:24:25.497Z",
+      "detail": "Bron tijdelijk niet bereikbaar | fout: Could not parse commodity unit price from cheapest contract details/payload"
     }
   ],
   "errors": [
+    {
+      "source": "getTTFGas",
+      "error": "HTTP 404 for https://markets.businessinsider.com/commodities/dutch-ttf-gas"
+    },
     {
       "source": "getGenerationMixShare",
       "error": "No NED generation mix values"
