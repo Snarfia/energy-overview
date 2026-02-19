@@ -1,8 +1,16 @@
 const urlParams = new URLSearchParams(window.location.search);
 const isLandscapeMode = urlParams.get("landscape") === "1";
 const isWidgetMode = urlParams.get("widget") === "1";
-const initialPageParam = urlParams.get("page");
+const initialPageParamRaw = urlParams.get("page");
 const pathLower = window.location.pathname.toLowerCase();
+
+function normalizePage(value) {
+  const v = String(value || "").trim().toLowerCase();
+  if (v === "gas" || v === "aardgas") return "gas";
+  if (v === "electricity" || v === "elektriciteit" || v === "power") return "electricity";
+  return null;
+}
+const initialPageParam = normalizePage(initialPageParamRaw);
 
 if (isLandscapeMode) document.documentElement.classList.add("mode-landscape");
 if (isWidgetMode) document.documentElement.classList.add("mode-widget");
@@ -910,7 +918,7 @@ async function loadOverview() {
 
 refreshBtn.addEventListener("click", loadOverview);
 const pageFromPath = pathLower.startsWith("/gas") ? "gas" : (pathLower.startsWith("/elektriciteit") ? "electricity" : null);
-setActivePage(pageFromPath || (initialPageParam === "gas" ? "gas" : "electricity"), false);
+setActivePage(pageFromPath || initialPageParam || "electricity", false);
 loadOverview();
 setInterval(loadOverview, 120000);
 
