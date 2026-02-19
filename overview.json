@@ -1,96 +1,364 @@
 {
-  "generatedAt": "2026-02-16T00:00:00.000Z",
-  "durationMs": 0,
+  "generatedAt": "2026-02-19T12:03:48.736Z",
+  "durationMs": 38890,
   "items": [
-    {
-      "id": "nlElectricityOverview",
-      "label": "Elektriciteit NL (actuele load)",
-      "value": null,
-      "unit": "MW",
-      "source": "Auto updater",
-      "sourceUrl": "https://github.com",
-      "updatedAt": "2026-02-16T00:00:00.000Z",
-      "detail": "Nog geen dataset gegenereerd. Draai de GitHub Action 'Update overview.json'.",
-      "rows": []
-    },
     {
       "id": "dayAheadPower24h",
       "label": "EPEX SPOT Day-Ahead NL (24h vooruit)",
-      "value": null,
+      "value": 79.13,
       "unit": "EUR/MWh",
-      "source": "Auto updater",
-      "sourceUrl": "https://github.com",
-      "updatedAt": "2026-02-16T00:00:00.000Z",
-      "detail": "Nog geen dataset gegenereerd.",
-      "rows": []
+      "source": "ENTSO-E Transparency API (EPEX SPOT NL)",
+      "sourceUrl": "https://web-api.tp.entsoe.eu/api",
+      "updatedAt": "2026-02-19T12:03:11.348Z",
+      "detail": "Komende 24 uur per uur",
+      "rows": [
+        {
+          "hour": "05:00",
+          "value": 88.41,
+          "unit": "EUR/MWh"
+        },
+        {
+          "hour": "06:00",
+          "value": 83.91,
+          "unit": "EUR/MWh"
+        },
+        {
+          "hour": "07:00",
+          "value": 90.25,
+          "unit": "EUR/MWh"
+        },
+        {
+          "hour": "08:00",
+          "value": 87.51,
+          "unit": "EUR/MWh"
+        },
+        {
+          "hour": "09:00",
+          "value": 70.1,
+          "unit": "EUR/MWh"
+        },
+        {
+          "hour": "10:00",
+          "value": 86.85,
+          "unit": "EUR/MWh"
+        },
+        {
+          "hour": "11:00",
+          "value": 79.37,
+          "unit": "EUR/MWh"
+        },
+        {
+          "hour": "12:00",
+          "value": 79.13,
+          "unit": "EUR/MWh"
+        },
+        {
+          "hour": "13:00",
+          "value": 80.07,
+          "unit": "EUR/MWh"
+        },
+        {
+          "hour": "14:00",
+          "value": 92.38,
+          "unit": "EUR/MWh"
+        },
+        {
+          "hour": "15:00",
+          "value": 95.51,
+          "unit": "EUR/MWh"
+        },
+        {
+          "hour": "16:00",
+          "value": 107.09,
+          "unit": "EUR/MWh"
+        },
+        {
+          "hour": "17:00",
+          "value": 118.2,
+          "unit": "EUR/MWh"
+        },
+        {
+          "hour": "18:00",
+          "value": 93.01,
+          "unit": "EUR/MWh"
+        },
+        {
+          "hour": "19:00",
+          "value": 91.85,
+          "unit": "EUR/MWh"
+        },
+        {
+          "hour": "20:00",
+          "value": 73.91,
+          "unit": "EUR/MWh"
+        },
+        {
+          "hour": "21:00",
+          "value": 77.36,
+          "unit": "EUR/MWh"
+        },
+        {
+          "hour": "22:00",
+          "value": 75.05,
+          "unit": "EUR/MWh"
+        },
+        {
+          "hour": "23:00",
+          "value": 70.1,
+          "unit": "EUR/MWh"
+        },
+        {
+          "hour": "00:00",
+          "value": 66.63,
+          "unit": "EUR/MWh"
+        },
+        {
+          "hour": "01:00",
+          "value": 68.94,
+          "unit": "EUR/MWh"
+        },
+        {
+          "hour": "02:00",
+          "value": 69.77,
+          "unit": "EUR/MWh"
+        },
+        {
+          "hour": "03:00",
+          "value": 71.24,
+          "unit": "EUR/MWh"
+        },
+        {
+          "hour": "04:00",
+          "value": 78.73,
+          "unit": "EUR/MWh"
+        }
+      ]
     },
     {
       "id": "ttfGas",
       "label": "TTF Gas",
-      "value": null,
+      "value": 32.5722,
       "unit": "EUR/MWh",
-      "source": "Auto updater",
-      "sourceUrl": "https://github.com",
-      "updatedAt": "2026-02-16T00:00:00.000Z",
-      "detail": "Nog geen dataset gegenereerd."
+      "source": "TradingEconomics",
+      "sourceUrl": "https://tradingeconomics.com/commodity/eu-natural-gas",
+      "updatedAt": "2026-02-19T12:03:14.937Z",
+      "detail": "tijdelijke bronstoring, laatste geldige waarde getoond | fout: HTTP 404 for https://markets.businessinsider.com/commodities/dutch-ttf-gas"
+    },
+    {
+      "id": "ets",
+      "label": "EU ETS (ICE EUA Futures)",
+      "value": 70.49,
+      "unit": "EUR/tCO2",
+      "source": "Barchart",
+      "sourceUrl": "https://www.barchart.com/futures/quotes/CKJ26",
+      "updatedAt": "02\\/18\\/26"
+    },
+    {
+      "id": "nlGasImport",
+      "label": "Netto in- en uitstroom aardgas",
+      "value": 600.43228,
+      "unit": "GWh/d",
+      "source": "ENTSOG API",
+      "sourceUrl": "https://transparency.entsog.eu/api/v1/operationaldatas?operatorKey=NL-TSO-0001&indicator=Physical+Flow&from=2026-02-15&to=2026-02-19&limit=6000",
+      "updatedAt": "2026-02-18T05:00:00.000Z",
+      "detail": "Positief = netto instroom, negatief = netto uitstroom",
+      "rows": [
+        {
+          "hour": "Belgie",
+          "value": 280.567183,
+          "unit": "GWh/d"
+        },
+        {
+          "hour": "Duitsland",
+          "value": -1567.8893590000002,
+          "unit": "GWh/d"
+        },
+        {
+          "hour": "Verenigd Koninkrijk",
+          "value": null,
+          "unit": "GWh/d"
+        },
+        {
+          "hour": "Denemarken",
+          "value": null,
+          "unit": "GWh/d"
+        },
+        {
+          "hour": "Noorwegen",
+          "value": 185.767493,
+          "unit": "GWh/d"
+        },
+        {
+          "hour": "LNG (Gate+EET)",
+          "value": 652.823084,
+          "unit": "GWh/d"
+        },
+        {
+          "hour": "Gasopslag (4 sites)",
+          "value": 780.06419,
+          "unit": "GWh/d"
+        },
+        {
+          "hour": "Nationale productie",
+          "value": 269.09968899999996,
+          "unit": "GWh/d"
+        }
+      ]
+    },
+    {
+      "id": "nlGasProduction",
+      "label": "Gaswinning NL (laatste dag)",
+      "value": 269.09968899999996,
+      "unit": "GWh/d",
+      "source": "ENTSOG API",
+      "sourceUrl": "https://transparency.entsog.eu/api/v1/operationaldatas?operatorKey=NL-TSO-0001&indicator=Allocation&from=2026-02-14&to=2026-02-19&limit=5000",
+      "updatedAt": "2026-02-18T05:00:00.000Z",
+      "detail": "Lokale productie (ENTSOG Allocation)",
+      "rows": [
+        {
+          "hour": "Production (NL)",
+          "value": 259.116251,
+          "unit": "GWh/d"
+        },
+        {
+          "hour": "Production Green Gas (NL)",
+          "value": 9.983438,
+          "unit": "GWh/d"
+        }
+      ]
+    },
+    {
+      "id": "nlCrossBorderFlows",
+      "label": "Cross-Border Physical Flows NL (live, netto)",
+      "value": 5018.557499999999,
+      "unit": "MW",
+      "source": "ENTSO-E Transparency API",
+      "sourceUrl": "https://web-api.tp.entsoe.eu/api",
+      "updatedAt": "2026-02-19T12:03:40.757Z",
+      "detail": "Positief = netto import naar NL, negatief = netto export uit NL",
+      "rows": [
+        {
+          "hour": "Belgie",
+          "value": 3910.9075,
+          "unit": "MW"
+        },
+        {
+          "hour": "Duitsland",
+          "value": -1286.58,
+          "unit": "MW"
+        },
+        {
+          "hour": "Verenigd Koninkrijk",
+          "value": 1101.23,
+          "unit": "MW"
+        },
+        {
+          "hour": "Denemarken",
+          "value": 680.94,
+          "unit": "MW"
+        },
+        {
+          "hour": "Noorwegen",
+          "value": 612.06,
+          "unit": "MW"
+        }
+      ]
     },
     {
       "id": "nlGasStorage",
       "label": "NL Gasopslag (actueel)",
-      "value": null,
+      "value": 13.2,
       "unit": "%",
-      "source": "Auto updater",
-      "sourceUrl": "https://github.com",
-      "updatedAt": "2026-02-16T00:00:00.000Z",
-      "detail": "Nog geen dataset gegenereerd.",
+      "source": "NED Website",
+      "sourceUrl": "https://ned.nl/nl/gasopslagen-nederland",
+      "updatedAt": "2026-02-19T12:03:41.199Z",
+      "detail": "Actuele nationale vullingsgraad van NED",
+      "rows": [
+        {
+          "hour": "Opslaginhoud",
+          "value": 18054.96,
+          "unit": "GWh"
+        }
+      ]
+    },
+    {
+      "id": "nlElectricityOverview",
+      "label": "Elektriciteit NL (actuele load)",
+      "value": 11083.28,
+      "unit": "MW",
+      "source": "ENTSO-E Transparency API",
+      "sourceUrl": "https://web-api.tp.entsoe.eu/api",
+      "updatedAt": "2026-02-19T11:15:00.000Z",
+      "detail": "Actuele load uit ENTSO-E",
       "rows": []
     },
     {
+      "id": "nlGridFrequency",
+      "label": "Netfrequentie NL (actueel)",
+      "value": 50,
+      "unit": "Hz",
+      "source": "mainsfrequency.com",
+      "sourceUrl": "https://mainsfrequency.com/",
+      "updatedAt": "2026-02-19T12:03:42.373Z",
+      "detail": "Doelwaarde rond 50 Hz"
+    },
+    {
+      "id": "nlGasConsumptionBreakdown",
+      "label": "Gasconsumptie NL (laatste volledige dag)",
+      "value": 512.130256,
+      "unit": "GWh/d",
+      "source": "ENTSOG API (fallback)",
+      "sourceUrl": "https://transparency.entsog.eu/api/v1/operationaldatas?operatorKey=NL-TSO-0001&indicator=Allocation&from=2026-02-13&to=2026-02-19&limit=6000",
+      "updatedAt": "2026-02-18T05:00:00.000Z",
+      "detail": "NED tijdelijk niet beschikbaar; ENTSOG exits gefilterd op local distribution/consumers/power plants",
+      "rows": []
+    },
+    {
+      "id": "tennetRegulation",
+      "label": "TenneT Balance Delta (actueel, 12s)",
+      "value": 247,
+      "unit": "MW",
+      "source": "TenneT API (Balance Delta High Res)",
+      "sourceUrl": "https://api.tennet.eu/publications/v1/balance-delta-high-res/latest",
+      "updatedAt": "2026-02-19T12:01:36Z",
+      "detail": "In 2.0 MW | Out 249.0 MW"
+    },
+    {
+      "id": "tennetSettlement",
+      "label": "TenneT Settlement Price (actueel)",
+      "value": 51.97,
+      "unit": "EUR/MWh",
+      "source": "TenneT API (fallback via Balance Delta)",
+      "sourceUrl": "https://api.tennet.eu/publications/v1/balance-delta-high-res/latest",
+      "updatedAt": "2026-02-19T12:01:36Z",
+      "detail": "Fallback | Mid 51.97 | Up n/a | Down 55.37"
+    },
+    {
       "id": "gaslichtElectricity",
-      "label": "Cheapest Electricity Provider (Gaslicht)",
-      "value": null,
+      "label": "Stroom referentieprijs (Overstappen.nl)",
+      "value": 0.2142,
       "unit": "EUR/kWh",
-      "source": "Gaslicht",
-      "sourceUrl": "https://www.gaslicht.com/stroom-vergelijken/resultaten?showonlyswitchable=False&contracttype=Vast&stroomhoogverbruik=1000&stroomlaagverbruik=1000",
-      "updatedAt": "2026-02-16T00:00:00.000Z",
-      "detail": "Placeholder tot eerste update"
+      "source": "Overstappen.nl",
+      "sourceUrl": "https://www.overstappen.nl/energie/stroomprijs/",
+      "updatedAt": "2026-02-19T12:03:47.821Z",
+      "detail": "Aanbieder: Greenchoice | Contract: Vast 1 jaar | De laagste prijs voor elektriciteit, inclusief belastingen, voor huishoudens"
     },
     {
       "id": "gaslichtGas",
-      "label": "Cheapest Gas Provider (Gaslicht)",
-      "value": null,
+      "label": "Gas referentieprijs (Overstappen.nl)",
+      "value": 1.1482,
       "unit": "EUR/m3",
-      "source": "Gaslicht",
-      "sourceUrl": "https://www.gaslicht.com/gas-vergelijken/resultaten?showonlyswitchable=False&contracttype=Vast&gasverbruik=1000",
-      "updatedAt": "2026-02-16T00:00:00.000Z",
-      "detail": "Placeholder tot eerste update"
-    },
-    {
-      "id": "gaslichtLongestContract",
-      "label": "Langste Contractduur (Gaslicht)",
-      "value": null,
-      "unit": "jaar",
-      "source": "Gaslicht",
-      "sourceUrl": "https://www.gaslicht.com/energievergelijken/",
-      "updatedAt": "2026-02-16T00:00:00.000Z",
-      "detail": "Placeholder tot eerste update"
-    },
-    {
-      "id": "gaslichtLongestContractElectricity",
-      "label": "Langste Contractduur Stroom",
-      "value": null,
-      "unit": "jaar",
-      "source": "Gaslicht",
-      "sourceUrl": "https://www.gaslicht.com/stroom-vergelijken/resultaten?showonlyswitchable=False&contracttype=Vast&stroomhoogverbruik=1000&stroomlaagverbruik=1000",
-      "updatedAt": "2026-02-16T00:00:00.000Z",
-      "detail": "Placeholder tot eerste update"
+      "source": "Overstappen.nl",
+      "sourceUrl": "https://www.overstappen.nl/energie/gasprijzen/",
+      "updatedAt": "2026-02-19T12:03:48.735Z",
+      "detail": "Aanbieder: Greenchoice | Contract: Vast 1 jaar | De laagste prijs voor aardgas, inclusief belastingen, voor huishoudens"
     }
   ],
   "errors": [
     {
-      "source": "bootstrap",
-      "error": "Nog geen live update gedraaid"
+      "source": "getTTFGas",
+      "error": "HTTP 404 for https://markets.businessinsider.com/commodities/dutch-ttf-gas"
     }
   ],
-  "note": "Startbestand voor statische hosting."
+  "note": "Data is fetched from public APIs/sources and may lag or change format."
 }
