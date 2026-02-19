@@ -1,110 +1,72 @@
 <!doctype html>
-<html lang="nl">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Energy Dashboard Build 2026-02-19-FINAL</title>
-    <style>
-      :root { --bg:#eef3ef; --card:#fff; --line:#d6dfda; --text:#1e2723; --muted:#52615b; --accent:#1d5f8c; }
-      *{box-sizing:border-box} html,body{width:100%;height:100%;margin:0;overflow:hidden;font-family:"Avenir Next","Segoe UI",sans-serif;background:linear-gradient(160deg,#f7f4ec,var(--bg));color:var(--text)}
-      body{display:grid;place-items:center}
-      .frame{width:min(100vw,calc(100vh*16/9));height:min(100vh,calc(100vw*9/16));background:rgba(255,255,255,.7);border:1px solid var(--line);border-radius:12px;padding:.5rem;display:grid;grid-template-rows:auto 1fr;gap:.45rem}
-      .top{display:flex;justify-content:space-between;align-items:center;gap:.5rem}
-      .tabs{display:flex;gap:.35rem}.tab{border:1px solid var(--line);background:#fff;color:var(--accent);text-decoration:none;padding:.33rem .7rem;border-radius:999px;font-size:.82rem;font-weight:700}.tab.active{background:var(--accent);color:#fff;border-color:var(--accent)}
-      .stamp{font-size:.72rem;color:var(--muted)}
-      .grid{display:grid;grid-template-columns:minmax(0,2.2fr) minmax(270px,1fr);grid-template-rows:minmax(0,1fr) minmax(0,1fr);gap:.45rem;min-height:0}
-      .panel{border:1px solid var(--line);border-radius:10px;background:var(--card);padding:.45rem;min-height:0;overflow:hidden;display:flex;flex-direction:column}
-      .main{grid-column:1;grid-row:1/span 2}.wholesale{grid-column:2;grid-row:1}.retail{grid-column:2;grid-row:2}
-      .title{font-size:.84rem;font-weight:700;margin:0 0 .3rem;color:#2d3935}
-      .cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.35rem;min-height:0}.stack{display:grid;grid-template-columns:1fr;gap:.35rem;min-height:0}
-      .card{border:1px solid var(--line);border-radius:8px;padding:.4rem;overflow:hidden}
-      .card h3{margin:0;font-size:.78rem;color:#33413d}.v{margin:.22rem 0 .15rem;font-size:1rem;font-weight:700}.m{margin:0;font-size:.68rem;line-height:1.2;color:var(--muted)}.src{display:inline-block;margin-top:.22rem;font-size:.66rem;color:var(--accent);text-decoration:none}
-      .viz{margin-top:.35rem;border:1px solid var(--line);border-radius:8px;background:#f7faf8;overflow:hidden}
-      .viz svg{display:block;width:100%;height:auto}
-      .n{fill:#fff;stroke:#739084;stroke-width:1.2}.n-nl{fill:#e8f3ff;stroke:#3c7fb0;stroke-width:1.5}
-      .t{font-size:10px;fill:#2a3531;font-weight:700}.tn{font-size:10px;fill:#41504b}.tv{font-size:10px;font-weight:700}
-      .imp{fill:#2c8b57;stroke:#2c8b57;opacity:.35}.exp{fill:#bd3f3f;stroke:#bd3f3f;opacity:.35}.vimp{fill:#1f6a44}.vexp{fill:#8f2b2b}
-      @media (max-width:900px){html,body{overflow:auto}.frame{width:100%;height:auto;min-height:100vh;border-radius:0;border:0}.grid{grid-template-columns:1fr;grid-template-rows:auto}.main,.wholesale,.retail{grid-column:auto;grid-row:auto}.cards{grid-template-columns:1fr}}
-    </style>
+    <title>Energy Market Overview</title>
+    <link rel="stylesheet" href="./styles.css?v=20260219-restore-01" />
   </head>
   <body>
-    <main class="frame">
-      <div class="top">
-        <div class="tabs">
-          <a id="tab-electricity" class="tab" href="/?page=electricity">Elektriciteit</a>
-          <a id="tab-gas" class="tab" href="/?page=gas">Aardgas</a>
+    <main class="page">
+      <header class="hero">
+        <p class="eyebrow">Live Dashboard</p>
+        <h1>Energy Market Overview</h1>
+        <p class="subtitle">Twee pagina's: Elektriciteit en Aardgas.</p>
+        <div class="actions">
+          <button id="refreshBtn">Refresh Now</button>
+          <p id="status" aria-live="polite">Loading latest data...</p>
         </div>
-        <div id="stamp" class="stamp">Build 2026-02-19-FINAL</div>
-      </div>
 
-      <section class="grid">
-        <section class="panel main"><h2 id="mainTitle" class="title"></h2><div id="mainCards" class="cards"></div></section>
-        <section class="panel wholesale"><h2 id="whTitle" class="title"></h2><div id="whCards" class="stack"></div></section>
-        <section class="panel retail"><h2 id="rtTitle" class="title"></h2><div id="rtCards" class="stack"></div></section>
+        <nav class="page-tabs" aria-label="Dashboard pages">
+          <a class="tab-btn" data-page="electricity" href="/?page=electricity">Elektriciteit</a>
+          <a class="tab-btn" data-page="gas" href="/?page=gas">Aardgas</a>
+        </nav>
+      </header>
+
+      <section id="page-electricity" class="main-blocks page-panel" aria-live="polite">
+        <section class="block block-demand">
+          <h2 class="block-title">Elektriciteit NL</h2>
+          <div id="electricityDemandCards" class="cards"></div>
+        </section>
+        <section class="block block-wholesale">
+          <h2 class="block-title">Elektriciteit - Groothandelsmarkten</h2>
+          <div id="electricityWholesaleCards" class="cards"></div>
+        </section>
+        <section class="block block-retail">
+          <h2 class="block-title">Elektriciteit - Retail</h2>
+          <div id="electricityRetailCards" class="cards"></div>
+        </section>
+      </section>
+
+      <section id="page-gas" class="main-blocks page-panel" aria-live="polite">
+        <section class="block block-demand">
+          <h2 class="block-title">Aardgas NL</h2>
+          <div id="gasDemandCards" class="cards"></div>
+        </section>
+        <section class="block block-wholesale">
+          <h2 class="block-title">Aardgas - Groothandelsmarkten</h2>
+          <div id="gasWholesaleCards" class="cards"></div>
+        </section>
+        <section class="block block-retail">
+          <h2 class="block-title">Aardgas - Retail</h2>
+          <div id="gasRetailCards" class="cards"></div>
+        </section>
+      </section>
+
+      <section class="footnote">
+        <p>Sources are fetched from different public websites/APIs on each refresh.</p>
       </section>
     </main>
 
-    <script>
-      const DEMAND={electricity:["nlElectricityOverview","tennetRegulation","nlGridFrequency","nlCrossBorderFlows"],gas:["nlGasConsumptionBreakdown","nlGasImport","nlGasProduction","nlGasStorage"]};
-      const WHOLESALE={electricity:["dayAheadPower24h","ets","tennetSettlement"],gas:["ttfGas","ets"]};
-      const RETAIL={electricity:["gaslichtElectricity"],gas:["gaslichtGas"]};
-      const q=new URLSearchParams(location.search); const p=String(q.get("page")||"").toLowerCase().trim(); const page=(p==="gas"||p==="aardgas")?"gas":"electricity";
-      document.getElementById("tab-electricity").classList.toggle("active",page==="electricity");
-      document.getElementById("tab-gas").classList.toggle("active",page==="gas");
-      document.getElementById("mainTitle").textContent=page==="gas"?"Aardgas NL":"Elektriciteit NL";
-      document.getElementById("whTitle").textContent=page==="gas"?"Aardgas - Groothandelsmarkten":"Elektriciteit - Groothandelsmarkten";
-      document.getElementById("rtTitle").textContent=page==="gas"?"Aardgas - Retail":"Elektriciteit - Retail";
-      const fmt=v=>{const n=Number(v);return Number.isFinite(n)?n.toLocaleString(undefined,{maximumFractionDigits:2}):"n/a"};
-      const unit2=v=>{const n=Number(v);return Number.isFinite(n)?n.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}):"n/a"};
-      const mk=(t,a={})=>{const e=document.createElementNS("http://www.w3.org/2000/svg",t);for(const[k,v]of Object.entries(a))e.setAttribute(k,String(v));return e;};
-      const ribbon=(x1,y1,x2,y2,w)=>{const dx=x2-x1,dy=y2-y1,l=Math.max(1,Math.hypot(dx,dy)),nx=-dy/l,ny=dx/l,hw=w/2,c=.34,c1x=x1+dx*c,c1y=y1+dy*c,c2x=x2-dx*c,c2y=y2-dy*c,p1x=x1+nx*hw,p1y=y1+ny*hw,p2x=x2+nx*hw,p2y=y2+ny*hw,p3x=x2-nx*hw,p3y=y2-ny*hw,p4x=x1-nx*hw,p4y=y1-ny*hw;return`M ${p1x} ${p1y} C ${c1x+nx*hw} ${c1y+ny*hw}, ${c2x+nx*hw} ${c2y+ny*hw}, ${p2x} ${p2y} L ${p3x} ${p3y} C ${c2x-nx*hw} ${c2y-ny*hw}, ${c1x-nx*hw} ${c1y-ny*hw}, ${p4x} ${p4y} Z`;};
-      function crossViz(rows,mode){
-        const wrap=document.createElement("div"); wrap.className="viz";
-        const svg=mk("svg",{viewBox:"0 0 760 250"}); wrap.appendChild(svg);
-        const NL={x:380,y:128,label:"NL"};
-        const A=mode==="gas"?{
-          "Verenigd Koninkrijk":{x:92,y:128,l:"GB"},"Belgie":{x:220,y:212,l:"BE"},"Duitsland":{x:654,y:128,l:"DE"},"Denemarken":{x:608,y:54,l:"DK"},"Noorwegen":{x:476,y:36,l:"NO"},
-          "LNG (Gate+EET)":{x:312,y:72,l:"LNG"},"Gasopslag (4 sites)":{x:380,y:210,l:"OPS"},"Nationale productie":{x:474,y:198,l:"PROD"}
-        }:{
-          "Verenigd Koninkrijk":{x:118,y:128,l:"GB"},"Belgie":{x:262,y:188,l:"BE"},"Duitsland":{x:624,y:128,l:"DE"},"Denemarken":{x:574,y:66,l:"DK"},"Noorwegen":{x:476,y:40,l:"NO"}
-        };
-        const rmap=new Map((rows||[]).map(r=>[String(r.hour||""),Number(r.value)]));
-        const vals=[...rmap.values()].filter(v=>Number.isFinite(v)).map(v=>Math.abs(v)); const max=Math.max(1,...vals);
-        for(const[name,p] of Object.entries(A)){
-          const v=rmap.get(name); const ok=Number.isFinite(v);
-          if(ok){
-            const bw=Math.max(3,Math.min(18,(Math.abs(v)/max)*18));
-            svg.appendChild(mk("path",{d:ribbon(p.x,p.y,NL.x,NL.y,bw),class:v<0?"exp":"imp"}));
-            const tx=(p.x+NL.x)/2,ty=(p.y+NL.y)/2-3;
-            const t=mk("text",{x:tx,y:ty,"text-anchor":"middle",class:`tv ${v<0?"vexp":"vimp"}`}); t.textContent=mode==="gas"?String(Math.round(v)):unit2(v/1000)+" GW"; svg.appendChild(t);
-          }
-          svg.appendChild(mk("rect",{x:p.x-11,y:p.y-11,width:22,height:22,rx:6,class:"n"}));
-          const c=mk("text",{x:p.x,y:p.y-15,"text-anchor":"middle",class:"t"}); c.textContent=p.l; svg.appendChild(c);
-          const n=mk("text",{x:p.x,y:p.y+24,"text-anchor":"middle",class:"tn"}); n.textContent=name; svg.appendChild(n);
-        }
-        svg.appendChild(mk("rect",{x:NL.x-14,y:NL.y-14,width:28,height:28,rx:7,class:"n-nl"}));
-        const nlt=mk("text",{x:NL.x,y:NL.y+4,"text-anchor":"middle",class:"t"}); nlt.textContent="NL"; svg.appendChild(nlt);
-        if(mode==="gas"){const f=mk("text",{x:742,y:240,"text-anchor":"end",class:"tn"});f.textContent="Getallen in GWh/dag";svg.appendChild(f);}
-        return wrap;
-      }
-      const card=(it)=>{
-        const el=document.createElement("article");el.className="card";const val=it.valueText||`${fmt(it.value)} ${it.unit||""}`.trim();
-        el.innerHTML=`<h3>${it.label||it.id}</h3><div class="v">${val}</div><p class="m">${it.source||"bron"} | ${it.updatedAt||""}${it.detail?` | ${it.detail}`:""}</p>${it.sourceUrl?`<a class="src" href="${it.sourceUrl}" target="_blank" rel="noreferrer">Open source</a>`:""}`;
-        if(it.id==="nlCrossBorderFlows"&&Array.isArray(it.rows)&&it.rows.length) el.appendChild(crossViz(it.rows,"electricity"));
-        if(it.id==="nlGasImport"&&Array.isArray(it.rows)&&it.rows.length) el.appendChild(crossViz(it.rows,"gas"));
-        return el;
-      };
-      async function load(){
-        const r=await fetch(`./overview.json?t=${Date.now()}`,{cache:"no-store"}); if(!r.ok) throw new Error(`HTTP ${r.status}`);
-        const data=await r.json(); const byId=new Map((data.items||[]).map(x=>[x.id,x]));
-        const main=document.getElementById("mainCards"),wh=document.getElementById("whCards"),rt=document.getElementById("rtCards"); main.innerHTML="";wh.innerHTML="";rt.innerHTML="";
-        for(const id of DEMAND[page]){const it=byId.get(id); if(it) main.appendChild(card(it));}
-        for(const id of WHOLESALE[page]){const it=byId.get(id); if(it) wh.appendChild(card(it));}
-        for(const id of RETAIL[page]){const it=byId.get(id); if(it) rt.appendChild(card(it));}
-        document.getElementById("stamp").textContent=`Build 2026-02-19-FINAL | ${new Date().toLocaleTimeString()}`;
-      }
-      load().catch(e=>document.getElementById("stamp").textContent=`Build 2026-02-19-FINAL | fout: ${e.message}`);
-      setInterval(load,120000);
-    </script>
+    <template id="cardTemplate">
+      <article class="card">
+        <h2 class="card-title"></h2>
+        <p class="card-value"></p>
+        <p class="card-meta"></p>
+        <a class="card-source" target="_blank" rel="noreferrer">Open source</a>
+      </article>
+    </template>
+
+    <script src="./app.js?v=20260219-restore-01"></script>
   </body>
 </html>
