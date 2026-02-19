@@ -28,8 +28,11 @@ jobs:
           TENNET_API_KEY: ${{ secrets.TENNET_API_KEY }}
         run: npm run update:overview
 
+      - name: Sync root overview.json
+        run: cp -f static/overview.json overview.json
+
       - name: Commit changes
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
-          commit_message: "chore(data): update static/overview.json"
-          file_pattern: static/overview.json
+          commit_message: "chore(data): update overview.json"
+          file_pattern: static/overview.json,overview.json

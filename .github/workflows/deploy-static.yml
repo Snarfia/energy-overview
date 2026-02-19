@@ -13,7 +13,6 @@ on:
       - "overview.json"
       - "gas.html"
       - "elektriciteit.html"
-      - "static/**"
       - ".github/workflows/deploy-static.yml"
   workflow_dispatch:
 
@@ -40,7 +39,6 @@ jobs:
           cp -f overview.json publish/overview.json
           cp -f gas.html publish/gas.html
           cp -f elektriciteit.html publish/elektriciteit.html
-          if [ -d static ]; then cp -R static publish/static; fi
           ls -la publish
 
       - name: Deploy via FTP
