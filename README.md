@@ -19,6 +19,18 @@ npm start
 
 Open daarna `http://localhost:8000`.
 
+## Landscape / widget mode (infoscherm)
+
+Gebruik URL-parameters:
+
+- `?landscape=1` forceert landscape-weergave.
+- `?widget=1` toont compacte kioskweergave en wisselt elke 30s tussen pagina's.
+- `?page=electricity` of `?page=gas` kiest de startpagina.
+
+Voorbeeld:
+
+`https://jouwdomein.nl/?landscape=1&widget=1&page=electricity`
+
 ## GitHub Actions die in de repo staan
 
 - `.github/workflows/update-overview.yml`

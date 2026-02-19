@@ -1,3 +1,11 @@
+const urlParams = new URLSearchParams(window.location.search);
+const isLandscapeMode = urlParams.get("landscape") === "1";
+const isWidgetMode = urlParams.get("widget") === "1";
+const initialPageParam = urlParams.get("page");
+
+if (isLandscapeMode) document.documentElement.classList.add("mode-landscape");
+if (isWidgetMode) document.documentElement.classList.add("mode-widget");
+
 const electricityDemandCardsEl = document.getElementById("electricityDemandCards");
 const electricityWholesaleCardsEl = document.getElementById("electricityWholesaleCards");
 const electricityRetailCardsEl = document.getElementById("electricityRetailCards");
@@ -625,6 +633,12 @@ async function loadOverview() {
 }
 
 refreshBtn.addEventListener("click", loadOverview);
-setActivePage("electricity");
+setActivePage(initialPageParam === "gas" ? "gas" : "electricity");
 loadOverview();
 setInterval(loadOverview, 120000);
+
+if (isWidgetMode) {
+  setInterval(() => {
+    setActivePage(activePage === "electricity" ? "gas" : "electricity");
+  }, 30000);
+}

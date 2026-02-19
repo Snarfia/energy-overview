@@ -12,6 +12,12 @@
 
 * { box-sizing: border-box; }
 
+html,
+body {
+  width: 100%;
+  min-height: 100%;
+}
+
 body {
   margin: 0;
   font-family: "Avenir Next", "Segoe UI", sans-serif;
@@ -187,6 +193,84 @@ button:hover { filter: brightness(1.05); }
 .pie-legend-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 .footnote { margin-top: 1rem; color: var(--muted); font-size: 0.82rem; }
+
+html.mode-landscape,
+html.mode-landscape body {
+  width: 100%;
+  height: 100%;
+}
+
+html.mode-landscape body {
+  overflow: hidden;
+}
+
+html.mode-landscape .page {
+  width: 100vw;
+  max-width: none;
+  min-height: 100vh;
+  padding: 1rem 1.2rem 1.2rem;
+  overflow: auto;
+}
+
+html.mode-widget .page {
+  width: 100vw;
+  max-width: none;
+  min-height: 100vh;
+  padding: 0.7rem 0.9rem 0.9rem;
+}
+
+html.mode-widget .eyebrow,
+html.mode-widget .subtitle,
+html.mode-widget .actions,
+html.mode-widget .page-tabs,
+html.mode-widget .footnote {
+  display: none;
+}
+
+html.mode-widget .hero h1 {
+  font-size: clamp(1.15rem, 1.8vw, 1.7rem);
+}
+
+html.mode-widget .main-blocks {
+  margin-top: 0.6rem;
+}
+
+html.mode-widget .page-panel.active {
+  gap: 0.7rem;
+}
+
+html.mode-widget .cards {
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.65rem;
+}
+
+html.mode-widget .card {
+  padding: 0.8rem;
+}
+
+html.mode-widget .card-value {
+  margin: 0.55rem 0 0.3rem;
+  font-size: 1.2rem;
+}
+
+html.mode-widget .dayahead-chart,
+html.mode-widget .flow-map,
+html.mode-widget .gas-flow-map,
+html.mode-widget .mix-embed {
+  min-height: 240px;
+}
+
+@media (orientation: portrait) {
+  html.mode-landscape .page {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vh;
+    height: 100vw;
+    transform-origin: top left;
+    transform: rotate(90deg) translateY(-100%);
+  }
+}
 
 @media (max-width: 760px) {
   .cards { grid-template-columns: 1fr; }
