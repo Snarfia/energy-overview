@@ -24,6 +24,18 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Build publish directory
+        run: |
+          rm -rf publish
+          mkdir -p publish
+          cp -f index.html publish/index.html || true
+          cp -f app.js publish/app.js || true
+          cp -f styles.css publish/styles.css || true
+          cp -f overview.json publish/overview.json || true
+          cp -f gas.html publish/gas.html || true
+          cp -f elektriciteit.html publish/elektriciteit.html || true
+          if [ -d static ]; then cp -R static publish/static; fi
+
       - name: Deploy via FTP (attempt 1)
         id: ftp_deploy_1
         continue-on-error: true
@@ -34,7 +46,7 @@ jobs:
           password: ${{ secrets.FTP_PASSWORD }}
           port: ${{ secrets.FTP_PORT }}
           protocol: ftps
-          local-dir: ./static/
+          local-dir: ./publish/
           server-dir: ${{ secrets.FTP_REMOTE_DIR }}
 
       - name: Deploy via FTP (attempt 2 retry same path)
@@ -48,7 +60,7 @@ jobs:
           password: ${{ secrets.FTP_PASSWORD }}
           port: ${{ secrets.FTP_PORT }}
           protocol: ftps
-          local-dir: ./static/
+          local-dir: ./publish/
           server-dir: ${{ secrets.FTP_REMOTE_DIR }}
 
       - name: Deploy via FTP (attempt 3 fallback /httpdocs/)
@@ -62,7 +74,7 @@ jobs:
           password: ${{ secrets.FTP_PASSWORD }}
           port: ${{ secrets.FTP_PORT }}
           protocol: ftps
-          local-dir: ./static/
+          local-dir: ./publish/
           server-dir: /httpdocs/
 
       - name: Deploy via FTP (attempt 4 fallback /httpdocs/static/)
@@ -76,7 +88,7 @@ jobs:
           password: ${{ secrets.FTP_PASSWORD }}
           port: ${{ secrets.FTP_PORT }}
           protocol: ftps
-          local-dir: ./static/
+          local-dir: ./publish/
           server-dir: /httpdocs/static/
 
       - name: Deploy via FTP (attempt 5 fallback protocol ftp)
@@ -90,7 +102,7 @@ jobs:
           password: ${{ secrets.FTP_PASSWORD }}
           port: 21
           protocol: ftp
-          local-dir: ./static/
+          local-dir: ./publish/
           server-dir: /httpdocs/
 
       - name: Fail if all deploy attempts failed
