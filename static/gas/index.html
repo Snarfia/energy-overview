@@ -3,8 +3,8 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Energy Market Overview</title>
-    <link rel="stylesheet" href="./styles.css" />
+    <title>Energy Market Overview - Gas</title>
+    <link rel="stylesheet" href="../styles.css" />
   </head>
   <body>
     <main class="page">
@@ -18,12 +18,12 @@
         </div>
 
         <nav class="page-tabs" aria-label="Dashboard pages">
-          <a class="tab-btn active" data-page="electricity" href="/elektriciteit/">Elektriciteit</a>
-          <a class="tab-btn" data-page="gas" href="/gas/">Aardgas</a>
+          <a class="tab-btn" data-page="electricity" href="/elektriciteit/">Elektriciteit</a>
+          <a class="tab-btn active" data-page="gas" href="/gas/">Aardgas</a>
         </nav>
       </header>
 
-      <section id="page-electricity" class="main-blocks page-panel active" aria-live="polite">
+      <section id="page-electricity" class="main-blocks page-panel" aria-live="polite">
         <section class="block block-demand">
           <h2 class="block-title">Elektriciteit NL</h2>
           <div id="electricityDemandCards" class="cards"></div>
@@ -38,7 +38,7 @@
         </section>
       </section>
 
-      <section id="page-gas" class="main-blocks page-panel" aria-live="polite">
+      <section id="page-gas" class="main-blocks page-panel active" aria-live="polite">
         <section class="block block-demand">
           <h2 class="block-title">Aardgas NL</h2>
           <div id="gasDemandCards" class="cards"></div>
@@ -67,6 +67,6 @@
       </article>
     </template>
 
-    <script src="./app.js"></script>
+    <script src="../app.js"></script>
   </body>
 </html>

@@ -2,6 +2,7 @@ const urlParams = new URLSearchParams(window.location.search);
 const isLandscapeMode = urlParams.get("landscape") === "1";
 const isWidgetMode = urlParams.get("widget") === "1";
 const initialPageParam = urlParams.get("page");
+const pathLower = window.location.pathname.toLowerCase();
 
 if (isLandscapeMode) document.documentElement.classList.add("mode-landscape");
 if (isWidgetMode) document.documentElement.classList.add("mode-widget");
@@ -31,14 +32,23 @@ const GAS_RETAIL_IDS = new Set(["gaslichtGas"]);
 
 let activePage = "electricity";
 
-function setActivePage(page) {
+function setActivePage(page, syncUrl = true) {
   activePage = page;
   for (const b of tabButtons) b.classList.toggle("active", b.dataset.page === page);
   for (const [name, panel] of Object.entries(pagePanels)) panel.classList.toggle("active", name === page);
+  if (syncUrl) {
+    const target = page === "gas" ? "/gas/" : "/elektriciteit/";
+    if (window.location.pathname !== target) {
+      window.history.replaceState({}, "", `${target}${window.location.search || ""}`);
+    }
+  }
 }
 
 for (const b of tabButtons) {
-  b.addEventListener("click", () => setActivePage(b.dataset.page));
+  b.addEventListener("click", (event) => {
+    event.preventDefault();
+    setActivePage(b.dataset.page, true);
+  });
 }
 
 function formatNumber(value) {
@@ -874,7 +884,7 @@ async function loadOverview() {
   statusEl.textContent = "Refreshing...";
   refreshBtn.disabled = true;
   try {
-    const response = await fetch(`./overview.json?t=${Date.now()}`, { cache: "no-store" });
+    const response = await fetch(`/overview.json?t=${Date.now()}`, { cache: "no-store" });
     if (!response.ok) throw new Error(`Request failed (${response.status})`);
 
     const payload = await response.json();
@@ -899,7 +909,8 @@ async function loadOverview() {
 }
 
 refreshBtn.addEventListener("click", loadOverview);
-setActivePage(initialPageParam === "gas" ? "gas" : "electricity");
+const pageFromPath = pathLower.startsWith("/gas") ? "gas" : (pathLower.startsWith("/elektriciteit") ? "electricity" : null);
+setActivePage(pageFromPath || (initialPageParam === "gas" ? "gas" : "electricity"), false);
 loadOverview();
 setInterval(loadOverview, 120000);
 
