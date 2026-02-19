@@ -1,5 +1,5 @@
 const urlParams = new URLSearchParams(window.location.search);
-const BUILD_TAG = "2026-02-19-01";
+const BUILD_TAG = "2026-02-19-02";
 const isLandscapeMode = urlParams.get("landscape") === "1";
 const isWidgetMode = urlParams.get("widget") === "1";
 const initialPageParamRaw = urlParams.get("page");
@@ -895,7 +895,7 @@ async function loadOverview() {
   statusEl.textContent = "Refreshing...";
   refreshBtn.disabled = true;
   try {
-    const response = await fetch(`/overview.json?t=${Date.now()}`, { cache: "no-store" });
+    const response = await fetch(`./overview.json?t=${Date.now()}`, { cache: "no-store" });
     if (!response.ok) throw new Error(`Request failed (${response.status})`);
 
     const payload = await response.json();
