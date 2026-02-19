@@ -1,6 +1,9 @@
 name: Deploy static site
 
 on:
+  workflow_run:
+    workflows: ["Update overview.json"]
+    types: [completed]
   push:
     branches: ["main"]
     paths:
@@ -10,6 +13,7 @@ on:
 
 jobs:
   deploy:
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
 
     steps:
