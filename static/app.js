@@ -37,10 +37,10 @@ function setActivePage(page, syncUrl = true) {
   for (const b of tabButtons) b.classList.toggle("active", b.dataset.page === page);
   for (const [name, panel] of Object.entries(pagePanels)) panel.classList.toggle("active", name === page);
   if (syncUrl) {
-    const target = page === "gas" ? "/gas.html" : "/elektriciteit.html";
-    if (window.location.pathname !== target) {
-      window.history.replaceState({}, "", `${target}${window.location.search || ""}`);
-    }
+    const next = new URL(window.location.href);
+    next.pathname = "/";
+    next.searchParams.set("page", page === "gas" ? "gas" : "electricity");
+    window.history.replaceState({}, "", `${next.pathname}${next.search}`);
   }
 }
 
