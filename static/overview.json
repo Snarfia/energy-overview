@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-02-19T07:32:34.872Z",
-  "durationMs": 40042,
+  "generatedAt": "2026-02-19T07:38:39.041Z",
+  "durationMs": 41884,
   "items": [
     {
       "id": "dayAheadPower24h",
@@ -9,7 +9,7 @@
       "unit": "EUR/MWh",
       "source": "ENTSO-E Transparency API (EPEX SPOT NL)",
       "sourceUrl": "https://web-api.tp.entsoe.eu/api",
-      "updatedAt": "2026-02-19T07:31:55.866Z",
+      "updatedAt": "2026-02-19T07:37:58.140Z",
       "detail": "Komende 24 uur per uur",
       "rows": [
         {
@@ -137,12 +137,11 @@
     {
       "id": "ttfGas",
       "label": "TTF Gas",
-      "value": 31.88,
+      "value": 32.7414,
       "unit": "EUR/MWh",
       "source": "TradingEconomics",
       "sourceUrl": "https://tradingeconomics.com/commodity/eu-natural-gas",
-      "updatedAt": "2026-02-19T07:31:58.818Z",
-      "detail": "tijdelijke bronstoring, laatste geldige waarde getoond | fout: HTTP 404 for https://markets.businessinsider.com/commodities/dutch-ttf-gas"
+      "updatedAt": "2026-02-19T07:37:58.533Z"
     },
     {
       "id": "ets",
@@ -160,8 +159,8 @@
       "unit": "GWh/d",
       "source": "ENTSOG API",
       "sourceUrl": "https://transparency.entsog.eu/api/v1/operationaldatas?operatorKey=NL-TSO-0001&indicator=Physical+Flow&from=2026-02-14&to=2026-02-18&limit=6000",
-      "updatedAt": "2026-02-19T07:32:18.655Z",
-      "detail": "Positief = netto instroom, negatief = netto uitstroom | tijdelijke bronstoring, laatste niet-nul waarde getoond | tijdelijke bronstoring, laatste niet-nul waarde getoond",
+      "updatedAt": "2026-02-19T07:38:24.528Z",
+      "detail": "Positief = netto instroom, negatief = netto uitstroom | tijdelijke bronstoring, laatste niet-nul waarde getoond | tijdelijke bronstoring, laatste niet-nul waarde getoond | tijdelijke bronstoring, laatste niet-nul waarde getoond",
       "rows": [
         {
           "hour": "Belgie",
@@ -230,11 +229,11 @@
     {
       "id": "nlCrossBorderFlows",
       "label": "Cross-Border Physical Flows NL (live, netto)",
-      "value": 2819.6753579999995,
+      "value": 2964.5813529999996,
       "unit": "MW",
       "source": "ENTSO-E Transparency API",
       "sourceUrl": "https://web-api.tp.entsoe.eu/api",
-      "updatedAt": "2026-02-19T07:32:24.735Z",
+      "updatedAt": "2026-02-19T07:38:27.787Z",
       "detail": "Positief = netto import naar NL, negatief = netto export uit NL",
       "rows": [
         {
@@ -244,22 +243,22 @@
         },
         {
           "hour": "Duitsland",
-          "value": -1119.64667,
+          "value": -549.22667,
           "unit": "MW"
         },
         {
           "hour": "Verenigd Koninkrijk",
-          "value": 0.06,
+          "value": -317.71,
           "unit": "MW"
         },
         {
           "hour": "Denemarken",
-          "value": 612.81,
+          "value": 605.87,
           "unit": "MW"
         },
         {
           "hour": "Noorwegen",
-          "value": 104.401278,
+          "value": 3.597273,
           "unit": "MW"
         }
       ]
@@ -271,7 +270,7 @@
       "unit": "%",
       "source": "NED Website",
       "sourceUrl": "https://ned.nl/nl/gasopslagen-nederland",
-      "updatedAt": "2026-02-19T07:32:25.171Z",
+      "updatedAt": "2026-02-19T07:38:28.510Z",
       "detail": "Actuele nationale vullingsgraad van NED",
       "rows": [
         {
@@ -299,7 +298,7 @@
       "unit": "Hz",
       "source": "mainsfrequency.com",
       "sourceUrl": "https://mainsfrequency.com/",
-      "updatedAt": "2026-02-19T07:32:26.663Z",
+      "updatedAt": "2026-02-19T07:38:29.840Z",
       "detail": "Doelwaarde rond 50 Hz"
     },
     {
@@ -309,7 +308,7 @@
       "unit": "GWh/d",
       "source": "ENTSOG API (fallback)",
       "sourceUrl": "https://transparency.entsog.eu/api/v1/operationaldatas?operatorKey=NL-TSO-0001&indicator=Allocation&from=2026-02-12&to=2026-02-18&limit=6000",
-      "updatedAt": "2026-02-19T07:32:31.357Z",
+      "updatedAt": "2026-02-19T07:38:35.988Z",
       "detail": "NED tijdelijk niet beschikbaar; ENTSOG exits gefilterd op local distribution/consumers/power plants | tijdelijke bronstoring, laatste geldige waarde getoond | fout: ENTSOG fallback consumption total is empty",
       "rows": []
     },
@@ -320,7 +319,7 @@
       "unit": "MW",
       "source": "TenneT API (Balance Delta High Res)",
       "sourceUrl": "https://api.tennet.eu/publications/v1/balance-delta-high-res/latest",
-      "updatedAt": "2026-02-19T07:30:24Z",
+      "updatedAt": "2026-02-19T07:36:36Z",
       "detail": "In 0.0 MW | Out 0.0 MW"
     },
     {
@@ -330,7 +329,7 @@
       "unit": "EUR/MWh",
       "source": "TenneT API (fallback via Balance Delta)",
       "sourceUrl": "https://api.tennet.eu/publications/v1/balance-delta-high-res/latest",
-      "updatedAt": "2026-02-19T07:30:24Z",
+      "updatedAt": "2026-02-19T07:36:36Z",
       "detail": "Fallback | Mid 53.38 | Up n/a | Down n/a"
     },
     {
@@ -340,7 +339,7 @@
       "unit": "EUR/kWh",
       "source": "Overstappen.nl",
       "sourceUrl": "https://www.overstappen.nl/energie/stroomprijs/",
-      "updatedAt": "2026-02-19T07:32:33.942Z",
+      "updatedAt": "2026-02-19T07:38:38.982Z",
       "detail": "Aanbieder: Greenchoice | Contract: Vast 1 jaar | De laagste prijs voor elektriciteit, inclusief belastingen, voor huishoudens"
     },
     {
@@ -350,15 +349,11 @@
       "unit": "EUR/m3",
       "source": "Overstappen.nl",
       "sourceUrl": "https://www.overstappen.nl/energie/gasprijzen/",
-      "updatedAt": "2026-02-19T07:32:34.871Z",
+      "updatedAt": "2026-02-19T07:38:39.040Z",
       "detail": "Aanbieder: Greenchoice | Contract: Vast 1 jaar | De laagste prijs voor aardgas, inclusief belastingen, voor huishoudens"
     }
   ],
   "errors": [
-    {
-      "source": "getTTFGas",
-      "error": "HTTP 404 for https://markets.businessinsider.com/commodities/dutch-ttf-gas"
-    },
     {
       "source": "",
       "error": "ENTSOG fallback consumption total is empty"
