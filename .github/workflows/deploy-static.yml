@@ -37,8 +37,10 @@ jobs:
           local-dir: ./static/
           server-dir: ${{ secrets.FTP_REMOTE_DIR }}
 
-      - name: Deploy via FTP (attempt 2 retry)
+      - name: Deploy via FTP (attempt 2 retry same path)
         if: steps.ftp_deploy_1.outcome == 'failure'
+        id: ftp_deploy_2
+        continue-on-error: true
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
           server: ${{ secrets.FTP_SERVER }}
@@ -48,3 +50,51 @@ jobs:
           protocol: ftps
           local-dir: ./static/
           server-dir: ${{ secrets.FTP_REMOTE_DIR }}
+
+      - name: Deploy via FTP (attempt 3 fallback /httpdocs/)
+        if: steps.ftp_deploy_1.outcome == 'failure' && steps.ftp_deploy_2.outcome == 'failure'
+        id: ftp_deploy_3
+        continue-on-error: true
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          port: ${{ secrets.FTP_PORT }}
+          protocol: ftps
+          local-dir: ./static/
+          server-dir: /httpdocs/
+
+      - name: Deploy via FTP (attempt 4 fallback /httpdocs/static/)
+        if: steps.ftp_deploy_1.outcome == 'failure' && steps.ftp_deploy_2.outcome == 'failure' && steps.ftp_deploy_3.outcome == 'failure'
+        id: ftp_deploy_4
+        continue-on-error: true
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          port: ${{ secrets.FTP_PORT }}
+          protocol: ftps
+          local-dir: ./static/
+          server-dir: /httpdocs/static/
+
+      - name: Deploy via FTP (attempt 5 fallback protocol ftp)
+        if: steps.ftp_deploy_1.outcome == 'failure' && steps.ftp_deploy_2.outcome == 'failure' && steps.ftp_deploy_3.outcome == 'failure' && steps.ftp_deploy_4.outcome == 'failure'
+        id: ftp_deploy_5
+        continue-on-error: true
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          port: 21
+          protocol: ftp
+          local-dir: ./static/
+          server-dir: /httpdocs/
+
+      - name: Fail if all deploy attempts failed
+        if: steps.ftp_deploy_1.outcome == 'failure' && steps.ftp_deploy_2.outcome == 'failure' && steps.ftp_deploy_3.outcome == 'failure' && steps.ftp_deploy_4.outcome == 'failure' && steps.ftp_deploy_5.outcome == 'failure'
+        run: |
+          echo "All FTP deploy attempts failed."
+          exit 1
