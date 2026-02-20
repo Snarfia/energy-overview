@@ -127,6 +127,23 @@ button:hover { filter: brightness(1.05); }
   display: none;
 }
 
+#page-gas .block-demand .cards {
+  grid-template-columns: 1fr;
+  height: 100%;
+}
+
+#page-gas .card[data-card-id="nlGasImport"] {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+#page-gas .card[data-card-id="nlGasImport"] .flow-map {
+  flex: 1;
+  min-height: 320px;
+  height: 100%;
+}
+
 .block {
   border-top: 2px solid var(--line);
   padding-top: 0.32rem;
