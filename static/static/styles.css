@@ -127,6 +127,16 @@ button:hover { filter: brightness(1.05); }
   display: none;
 }
 
+#page-gas.page-panel.active {
+  grid-template-columns: minmax(0, 1.75fr) minmax(420px, 1.25fr);
+}
+
+#page-gas .block-wholesale .cards,
+#page-gas .block-retail .cards {
+  overflow-y: auto;
+  padding-right: 0.2rem;
+}
+
 #page-gas .block-demand .cards {
   grid-template-columns: 1fr;
   height: 100%;
