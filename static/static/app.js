@@ -874,14 +874,14 @@ function splitItems(items) {
     else if (GAS_RETAIL_IDS.has(item.id)) gas.retail.push(item);
   }
 
-  const electricityDemandOrder = ["nlElectricityOverview", "tennetRegulation", "nlGridFrequency", "nlCrossBorderFlows"];
+  const electricityDemandOrder = ["nlCrossBorderFlows", "nlElectricityOverview", "tennetRegulation", "nlGridFrequency"];
   electricity.demand.sort((a, b) => {
     const ia = electricityDemandOrder.indexOf(a.id);
     const ib = electricityDemandOrder.indexOf(b.id);
     return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib);
   });
 
-  const gasDemandOrder = ["nlGasConsumptionBreakdown", "nlGasStorage", "nlGasProduction", "nlGasImport"];
+  const gasDemandOrder = ["nlGasImport", "nlGasConsumptionBreakdown", "nlGasStorage", "nlGasProduction"];
   gas.demand.sort((a, b) => {
     const ia = gasDemandOrder.indexOf(a.id);
     const ib = gasDemandOrder.indexOf(b.id);
