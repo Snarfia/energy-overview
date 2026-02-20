@@ -874,7 +874,7 @@ function splitItems(items) {
     else if (GAS_RETAIL_IDS.has(item.id)) gas.retail.push(item);
   }
 
-  const electricityDemandOrder = ["nlCrossBorderFlows", "dayAheadPower24h", "nlElectricityOverview", "tennetRegulation", "nlGridFrequency", "ets", "tennetSettlement", "gaslichtElectricity"];
+  const electricityDemandOrder = ["nlCrossBorderFlows", "dayAheadPower24h", "nlElectricityOverview", "nlGridFrequency", "tennetRegulation", "ets", "tennetSettlement", "gaslichtElectricity"];
   electricity.demand.sort((a, b) => {
     const ia = electricityDemandOrder.indexOf(a.id);
     const ib = electricityDemandOrder.indexOf(b.id);
@@ -907,10 +907,16 @@ async function loadOverview() {
     );
     renderPageCards({ demand: gasDemandCardsEl, wholesale: gasWholesaleCardsEl, retail: gasRetailCardsEl }, split.gas);
 
+    const generated = payload.generatedAt ? new Date(payload.generatedAt) : null;
+    const generatedValid = generated && !Number.isNaN(generated.getTime());
+    const generatedText = generatedValid ? generated.toLocaleString() : "onbekend";
+    const ageMin = generatedValid ? Math.round((Date.now() - generated.getTime()) / 60000) : null;
+    const staleNote = Number.isFinite(ageMin) && ageMin > 90 ? ` | let op: data ${ageMin} min oud` : "";
+
     if (payload.errors && payload.errors.length > 0) {
-      statusEl.textContent = `Loaded with ${payload.errors.length} source error(s) at ${new Date().toLocaleTimeString()} [${BUILD_TAG}]`;
+      statusEl.textContent = `Data: ${generatedText}${staleNote} | ${payload.errors.length} bronfout(en) [${BUILD_TAG}]`;
     } else {
-      statusEl.textContent = `Updated at ${new Date().toLocaleTimeString()} (${payload.durationMs} ms) [${BUILD_TAG}]`;
+      statusEl.textContent = `Data: ${generatedText}${staleNote} (${payload.durationMs} ms) [${BUILD_TAG}]`;
     }
   } catch (error) {
     statusEl.textContent = `Failed to load data: ${error.message} [${BUILD_TAG}]`;
