@@ -119,7 +119,7 @@ button:hover { filter: brightness(1.05); }
   display: flex;
   flex-direction: column;
 }
-.block-title { margin: 0 0 0.25rem; font-size: 0.84rem; color: #2e3935; }
+.block-title { margin: 0 0 0.25rem; font-size: 0.92rem; color: #2e3935; }
 
 .block-demand {
   grid-column: 1;
@@ -165,9 +165,9 @@ button:hover { filter: brightness(1.05); }
 }
 
 .card.card-wide { grid-column: 1 / -1; }
-.card-title { margin: 0; font-size: 0.82rem; color: #2e3935; line-height: 1.2; }
-.card-value { margin: 0.3rem 0 0.15rem; font-size: 1.02rem; font-weight: 700; line-height: 1.12; }
-.card-meta { margin: 0; color: var(--muted); font-size: 0.7rem; line-height: 1.18; }
+.card-title { margin: 0; font-size: 0.94rem; color: #2e3935; line-height: 1.2; }
+.card-value { margin: 0.3rem 0 0.15rem; font-size: 1.28rem; font-weight: 700; line-height: 1.12; }
+.card-meta { margin: 0; color: var(--muted); font-size: 0.78rem; line-height: 1.2; }
 .card-source { display: inline-block; margin-top: 0.33rem; color: var(--accent); text-decoration: none; font-weight: 600; font-size: 0.7rem; }
 .card-source:hover { text-decoration: underline; }
 
@@ -198,7 +198,7 @@ button:hover { filter: brightness(1.05); }
 .dayahead-plot-bg { fill: rgba(15, 122, 98, 0.04); }
 .dayahead-grid { stroke: rgba(26, 31, 29, 0.12); stroke-width: 1; }
 .dayahead-axis { stroke: rgba(26, 31, 29, 0.45); stroke-width: 1; }
-.dayahead-axis-label { fill: var(--muted); font-size: 14px; }
+.dayahead-axis-label { fill: var(--muted); font-size: 15px; }
 .dayahead-line { fill: none; stroke: var(--accent); stroke-width: 2; }
 .dayahead-now-line { stroke: #111; stroke-width: 2; stroke-dasharray: 4 4; opacity: 0.85; }
 .dayahead-now-label { fill: #111; font-size: 13px; font-weight: 700; }
@@ -220,7 +220,7 @@ button:hover { filter: brightness(1.05); }
 .flow-map-label { fill: #2e3935; font-size: 13px; font-weight: 700; }
 .flow-map-label-nl { fill: #fff; font-size: 13px; font-weight: 700; }
 .flow-map-country { fill: var(--muted); font-size: 12px; }
-.flow-map-value { fill: var(--muted); font-size: 14px; }
+.flow-map-value { fill: var(--muted); font-size: 17px; }
 .flow-map-value-import { fill: #111; }
 .flow-map-value-export { fill: #0f7a62; }
 .flow-map-value { paint-order: stroke; stroke: rgba(255, 255, 255, 0.92); stroke-width: 3px; stroke-linejoin: round; }

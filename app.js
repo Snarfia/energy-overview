@@ -33,8 +33,8 @@ const pagePanels = {
   gas: document.getElementById("page-gas"),
 };
 
-const ELECTRICITY_DEMAND_IDS = new Set(["nlElectricityOverview", "tennetRegulation", "nlGridFrequency", "nlCrossBorderFlows"]);
-const ELECTRICITY_WHOLESALE_IDS = new Set(["dayAheadPower24h", "ets", "tennetSettlement"]);
+const ELECTRICITY_DEMAND_IDS = new Set(["nlCrossBorderFlows", "dayAheadPower24h", "nlElectricityOverview", "tennetRegulation", "nlGridFrequency"]);
+const ELECTRICITY_WHOLESALE_IDS = new Set(["ets", "tennetSettlement"]);
 const ELECTRICITY_RETAIL_IDS = new Set(["gaslichtElectricity"]);
 
 const GAS_DEMAND_IDS = new Set(["nlGasConsumptionBreakdown", "nlGasImport", "nlGasProduction", "nlGasStorage"]);
@@ -770,7 +770,7 @@ function createCard(item) {
 
   const cardEl = node.querySelector(".card");
   cardEl.dataset.cardId = item.id;
-  if (item.id === "dayAheadPower24h" || item.id === "nlCrossBorderFlows" || item.id === "nlGasImport") cardEl.classList.add("card-wide");
+  if (item.id === "nlGasImport") cardEl.classList.add("card-wide");
 
   if (item.id === "dayAheadPower24h" && Array.isArray(item.rows) && item.rows.length > 0) {
     const chart = createDayAheadChart(orderDayAheadRowsForDisplay(item.rows));
@@ -874,7 +874,7 @@ function splitItems(items) {
     else if (GAS_RETAIL_IDS.has(item.id)) gas.retail.push(item);
   }
 
-  const electricityDemandOrder = ["nlCrossBorderFlows", "nlElectricityOverview", "tennetRegulation", "nlGridFrequency"];
+  const electricityDemandOrder = ["nlCrossBorderFlows", "dayAheadPower24h", "nlElectricityOverview", "tennetRegulation", "nlGridFrequency"];
   electricity.demand.sort((a, b) => {
     const ia = electricityDemandOrder.indexOf(a.id);
     const ib = electricityDemandOrder.indexOf(b.id);
