@@ -112,6 +112,21 @@ button:hover { filter: brightness(1.05); }
   height: 100%;
 }
 
+#page-electricity.page-panel.active {
+  grid-template-columns: 1fr;
+  grid-template-rows: minmax(0, 1fr);
+}
+
+#page-electricity .block-demand {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+#page-electricity .block-wholesale,
+#page-electricity .block-retail {
+  display: none;
+}
+
 .block {
   border-top: 2px solid var(--line);
   padding-top: 0.32rem;
