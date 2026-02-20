@@ -1,5 +1,5 @@
 const urlParams = new URLSearchParams(window.location.search);
-const BUILD_TAG = "2026-02-20-01";
+const BUILD_TAG = "2026-02-20-02";
 const isLandscapeMode = urlParams.get("landscape") === "1";
 const isWidgetMode = urlParams.get("widget") === "1";
 const initialPageParamRaw = urlParams.get("page");
@@ -38,8 +38,8 @@ const ELECTRICITY_WHOLESALE_IDS = new Set([]);
 const ELECTRICITY_RETAIL_IDS = new Set([]);
 
 const GAS_DEMAND_IDS = new Set(["nlGasImport"]);
-const GAS_WHOLESALE_IDS = new Set(["nlGasConsumptionBreakdown", "nlGasStorage", "nlGasProduction", "ttfGas", "ets"]);
-const GAS_RETAIL_IDS = new Set(["gaslichtGas"]);
+const GAS_WHOLESALE_IDS = new Set(["nlGasConsumptionBreakdown", "nlGasStorage", "nlGasProduction", "ttfGas", "ets", "gaslichtGas"]);
+const GAS_RETAIL_IDS = new Set([]);
 
 let activePage = "electricity";
 
@@ -888,14 +888,14 @@ function splitItems(items) {
     return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib);
   });
 
-  const gasWholesaleOrder = ["nlGasConsumptionBreakdown", "nlGasStorage", "nlGasProduction", "ttfGas", "ets"];
+  const gasWholesaleOrder = ["nlGasConsumptionBreakdown", "nlGasStorage", "nlGasProduction", "ttfGas", "ets", "gaslichtGas"];
   gas.wholesale.sort((a, b) => {
     const ia = gasWholesaleOrder.indexOf(a.id);
     const ib = gasWholesaleOrder.indexOf(b.id);
     return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib);
   });
 
-  const gasRetailOrder = ["gaslichtGas"];
+  const gasRetailOrder = [];
   gas.retail.sort((a, b) => {
     const ia = gasRetailOrder.indexOf(a.id);
     const ib = gasRetailOrder.indexOf(b.id);

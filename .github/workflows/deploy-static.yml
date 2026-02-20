@@ -1,6 +1,8 @@
 name: Deploy static site
 
 on:
+  schedule:
+    - cron: "*/5 * * * *"
   workflow_run:
     workflows: ["Update overview.json"]
     types: [completed]
@@ -10,6 +12,7 @@ on:
       - "index.html"
       - "app.js"
       - "styles.css"
+      - "static/**"
       - "overview.json"
       - "gas.html"
       - "elektriciteit.html"
@@ -28,6 +31,21 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Generate fresh overview.json
+        env:
+          ENTSOE_API_TOKEN: ${{ secrets.ENTSOE_API_TOKEN }}
+          NED_API_TOKEN: ${{ secrets.NED_API_TOKEN }}
+          TENNET_API_KEY: ${{ secrets.TENNET_API_KEY }}
+        run: |
+          npm install --no-audit --no-fund
+          npm run update:overview
+          cp -f static/overview.json overview.json
 
       - name: Prepare publish directory
         run: |
