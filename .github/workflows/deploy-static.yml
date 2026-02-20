@@ -33,12 +33,18 @@ jobs:
         run: |
           rm -rf publish
           mkdir -p publish
-          cp -f index.html publish/index.html
-          cp -f app.js publish/app.js
-          cp -f styles.css publish/styles.css
-          cp -f overview.json publish/overview.json
-          cp -f gas.html publish/gas.html
-          cp -f elektriciteit.html publish/elektriciteit.html
+          # Prefer static/ as source (current production structure); fallback to root files.
+          SRC="."
+          if [ -f "static/index.html" ] && [ -f "static/app.js" ] && [ -f "static/styles.css" ]; then
+            SRC="static"
+          fi
+          echo "Using source directory: $SRC"
+          cp -f "$SRC/index.html" publish/index.html
+          cp -f "$SRC/app.js" publish/app.js
+          cp -f "$SRC/styles.css" publish/styles.css
+          cp -f "$SRC/overview.json" publish/overview.json
+          cp -f "$SRC/gas.html" publish/gas.html
+          cp -f "$SRC/elektriciteit.html" publish/elektriciteit.html
           ls -la publish
 
       - name: Deploy via FTP
