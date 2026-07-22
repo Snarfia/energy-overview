@@ -1,5 +1,5 @@
 const urlParams = new URLSearchParams(window.location.search);
-const BUILD_TAG = "2026-07-22-03";
+const BUILD_TAG = "2026-07-22-04";
 const isLandscapeMode = urlParams.get("landscape") === "1";
 const isWidgetMode = urlParams.get("widget") === "1";
 const initialPageParamRaw = urlParams.get("page");
@@ -53,7 +53,7 @@ const CARD_EXPLANATIONS = {
   nlGasImport: "Alle getoonde aanvoer minus opslagvulling en binnenlands verbruik. De kleine restbalans hoort rond nul te liggen.",
   nlGasConsumptionBreakdown: "Geschat Nederlands dagverbruik uit distributie, industrie en gascentrales op dezelfde volledige gasdag.",
   nlGasStorage: "Vullingsgraad van de Nederlandse gasopslagen. De stroom naar of uit opslag staat apart op de stromenkaart.",
-  nlGasProduction: "Binnenlandse gasproductie op de laatste volledige gasdag, inclusief groen gas waar beschikbaar.",
+  nlGasProduction: "Binnenlandse gasproductie op exact dezelfde volledige gasdag als de balanskaart, inclusief groen gas waar beschikbaar.",
   ttfGas: "Europese groothandelsreferentie voor aardgas in EUR/MWh; exclusief belasting, transport en leveranciersmarge.",
   gaslichtGas: "Consumentenreferentie per m³ inclusief belastingen; niet rechtstreeks vergelijkbaar met TTF in EUR/MWh.",
 };

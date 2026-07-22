@@ -1100,7 +1100,7 @@ async function getNlGasProduction(preferredDay = null) {
   const total = dayRows.reduce((s, r) => s + (entsogGwhDay(r.value, r.unit) || 0), 0);
   return {
     id: 'nlGasProduction',
-    label: 'Gaswinning NL (laatste dag)',
+    label: preferredDay ? 'Gaswinning NL (zelfde gasdag)' : 'Gaswinning NL (laatste dag)',
     value: total,
     unit: 'GWh/d',
     source: 'ENTSOG API',
@@ -1375,7 +1375,7 @@ async function getNlGasConsumptionBreakdown() {
   const rows = totals.map(([label, gwh]) => ({ hour: label, value: (gwh / total) * 100, unit: '%' }));
   return {
     id: 'nlGasConsumptionBreakdown',
-    label: 'Gasconsumptie NL (laatste volledige dag)',
+    label: preferredDay ? 'Gasconsumptie NL (zelfde gasdag)' : 'Gasconsumptie NL (laatste volledige dag)',
     value: total,
     unit: 'GWh/d',
     source: 'NED API',
@@ -1631,8 +1631,17 @@ async function collectOverview() {
   // not represented in the compact country view.
   const gasFlow = items.find((item) => item?.id === 'nlGasImport');
   const gasConsumption = items.find((item) => item?.id === 'nlGasConsumptionBreakdown');
+  const gasProduction = items.find((item) => item?.id === 'nlGasProduction');
   if (gasFlow && gasConsumption && Array.isArray(gasFlow.rows)) {
     const flowDay = String(gasFlow.updatedAt || '').slice(0, 10);
+    const productionDay = String(gasProduction?.updatedAt || '').slice(0, 10);
+    if (gasProduction && flowDay && productionDay && flowDay !== productionDay) {
+      try {
+        Object.assign(gasProduction, await getNlGasProduction(flowDay));
+      } catch (err) {
+        errors.push({ source: 'gasProductionAlignment', error: String(err.message || err) });
+      }
+    }
     let consumptionDay = String(gasConsumption.updatedAt || '').slice(0, 10);
     if (flowDay && consumptionDay && flowDay !== consumptionDay) {
       try {
