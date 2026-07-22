@@ -113,7 +113,7 @@ button:hover { filter: brightness(1.05); }
 }
 
 #page-electricity.page-panel.active {
-  grid-template-columns: minmax(0, 2.55fr) minmax(350px, 0.85fr);
+  grid-template-columns: minmax(0, 1fr);
   grid-template-rows: minmax(0, 1fr);
 }
 
@@ -123,8 +123,7 @@ button:hover { filter: brightness(1.05); }
 }
 
 #page-electricity .block-wholesale {
-  grid-column: 2;
-  grid-row: 1;
+  display: none;
 }
 
 #page-electricity .block-retail {
@@ -132,7 +131,7 @@ button:hover { filter: brightness(1.05); }
 }
 
 #page-electricity .block-demand .cards {
-  grid-template-columns: 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 0.32fr);
   grid-template-rows: minmax(0, 2.1fr) minmax(0, 0.9fr);
   height: 100%;
 }
@@ -146,6 +145,8 @@ button:hover { filter: brightness(1.05); }
 }
 
 #page-electricity .card[data-card-id="nlCrossBorderFlows"] {
+  grid-column: 1 / -1;
+  grid-row: 1;
   position: relative;
   display: flex;
   flex-direction: column;
@@ -177,8 +178,40 @@ button:hover { filter: brightness(1.05); }
 }
 
 #page-electricity .card[data-card-id="dayAheadPower24h"] {
+  grid-column: 1;
+  grid-row: 2;
   display: flex;
   flex-direction: column;
+}
+
+#page-electricity .card[data-card-id="gaslichtElectricity"] {
+  grid-column: 2;
+  grid-row: 2;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  border-color: rgba(15, 122, 98, 0.25);
+  background: linear-gradient(145deg, #f2faf7 0%, #ffffff 100%);
+}
+
+#page-electricity .card[data-card-id="gaslichtElectricity"] .card-title {
+  font-size: 0.82rem;
+}
+
+#page-electricity .card[data-card-id="gaslichtElectricity"] .card-value {
+  color: #0b6c58;
+  font-size: 1.46rem;
+}
+
+#page-electricity .card[data-card-id="gaslichtElectricity"] .card-explainer {
+  font-size: 0.68rem;
+}
+
+#page-electricity .card[data-card-id="gaslichtElectricity"] .card-meta {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 #page-electricity .card[data-card-id="dayAheadPower24h"] .card-meta,
@@ -597,9 +630,11 @@ button:hover { filter: brightness(1.05); }
 }
 
 @media (min-width: 1500px) {
-  #page-electricity.page-panel.active,
   #page-gas.page-panel.active {
     grid-template-columns: minmax(0, 2.75fr) minmax(420px, 0.9fr);
+  }
+  #page-electricity.page-panel.active {
+    grid-template-columns: minmax(0, 1fr);
   }
   #page-electricity .block-wholesale .cards {
     grid-template-columns: 1fr;
@@ -759,6 +794,11 @@ html.mode-widget .mix-embed {
   }
   #page-electricity .card[data-card-id="nlCrossBorderFlows"] {
     grid-column: auto;
+  }
+  #page-electricity .card[data-card-id="dayAheadPower24h"],
+  #page-electricity .card[data-card-id="gaslichtElectricity"] {
+    grid-column: auto;
+    grid-row: auto;
   }
   .dayahead-chart-panel {
     grid-template-columns: 1fr;

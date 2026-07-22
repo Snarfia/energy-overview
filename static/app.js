@@ -1,5 +1,5 @@
 const urlParams = new URLSearchParams(window.location.search);
-const BUILD_TAG = "2026-07-22-10";
+const BUILD_TAG = "2026-07-22-11";
 const isLandscapeMode = urlParams.get("landscape") === "1";
 const isWidgetMode = urlParams.get("widget") === "1";
 const initialPageParamRaw = urlParams.get("page");
@@ -33,8 +33,8 @@ const pagePanels = {
   gas: document.getElementById("page-gas"),
 };
 
-const ELECTRICITY_DEMAND_IDS = new Set(["nlCrossBorderFlows", "dayAheadPower24h"]);
-const ELECTRICITY_WHOLESALE_IDS = new Set(["ets", "gaslichtElectricity"]);
+const ELECTRICITY_DEMAND_IDS = new Set(["nlCrossBorderFlows", "dayAheadPower24h", "gaslichtElectricity"]);
+const ELECTRICITY_WHOLESALE_IDS = new Set([]);
 const ELECTRICITY_RETAIL_IDS = new Set([]);
 
 const GAS_DEMAND_IDS = new Set(["nlGasImport"]);
@@ -49,7 +49,7 @@ const CARD_EXPLANATIONS = {
   nlGridFrequency: "De netfrequentie hoort rond 50 Hz te blijven; kleine afwijkingen tonen de directe balans tussen productie en verbruik.",
   tennetRegulation: "Onbalanssignaal van TenneT. Het toont hoeveel regelvermogen op dit moment wordt ingezet.",
   ets: "Prijs van een Europees emissierecht voor één ton CO₂; dit is een termijnmarktprijs.",
-  gaslichtElectricity: "Consumentenreferentie inclusief belastingen; niet rechtstreeks vergelijkbaar met de EPEX-groothandelsprijs.",
+  gaslichtElectricity: "Laagste actuele stroomtarief voor een 1-jaar-vast consumentencontract; inclusief belastingen, exclusief netbeheerkosten.",
   nlGasImport: "Alle getoonde aanvoer minus opslagvulling en binnenlands verbruik. De kleine restbalans hoort rond nul te liggen.",
   nlGasConsumptionBreakdown: "Geschat Nederlands dagverbruik uit distributie, industrie en gascentrales op dezelfde volledige gasdag.",
   nlGasStorage: "Vullingsgraad van de Nederlandse gasopslagen. De stroom naar of uit opslag staat apart op de stromenkaart.",
@@ -268,8 +268,8 @@ function createDayAheadChartPanel(rows) {
     block.appendChild(time);
     extremes.appendChild(block);
   };
-  addExtreme("Laagste", lowest, "is-low");
   addExtreme("Hoogste", highest, "is-high");
+  addExtreme("Laagste", lowest, "is-low");
   panel.appendChild(extremes);
   return panel;
 }
@@ -1283,14 +1283,14 @@ function splitItems(items) {
     else if (GAS_RETAIL_IDS.has(item.id)) gas.retail.push(item);
   }
 
-  const electricityDemandOrder = ["nlCrossBorderFlows", "dayAheadPower24h"];
+  const electricityDemandOrder = ["nlCrossBorderFlows", "dayAheadPower24h", "gaslichtElectricity"];
   electricity.demand.sort((a, b) => {
     const ia = electricityDemandOrder.indexOf(a.id);
     const ib = electricityDemandOrder.indexOf(b.id);
     return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib);
   });
 
-  const electricityWholesaleOrder = ["ets", "gaslichtElectricity"];
+  const electricityWholesaleOrder = [];
   electricity.wholesale.sort((a, b) => {
     const ia = electricityWholesaleOrder.indexOf(a.id);
     const ib = electricityWholesaleOrder.indexOf(b.id);

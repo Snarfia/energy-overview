@@ -1638,6 +1638,35 @@ async function getOverstappenReference(kind) {
     return new Date(Date.UTC(Number(m[3]), months[m[2]], Number(m[1]), 12)).toISOString();
   };
 
+  // On the electricity dashboard, use a like-for-like household offer:
+  // the cheapest currently listed fixed contract with a one-year term.
+  if (!isGas) {
+    const fixedOneYear = [];
+    const fixedOneYearPattern = /([A-Z][A-Za-z0-9&'’\-\s]{2,60}?)\s+Vast\s+1\s+jaar\s+(?:€|&euro;)\s*([0-9]+(?:[.,][0-9]{2,4})?)/ig;
+    let fixedMatch;
+    while ((fixedMatch = fixedOneYearPattern.exec(pageText))) {
+      const provider = String(fixedMatch[1] || '').trim().replace(/\s{2,}/g, ' ');
+      const value = toNumber(fixedMatch[2]);
+      if (!provider || provider.length < 3 || value === null || value <= 0.03 || value >= 2) continue;
+      fixedOneYear.push({ provider, value });
+    }
+    if (fixedOneYear.length) {
+      const best = fixedOneYear.sort((a, b) => a.value - b.value)[0];
+      return {
+        id: 'gaslichtElectricity',
+        label: 'Stroom consumentenprijs (1 jaar vast)',
+        value: best.value,
+        unit,
+        source: 'Overstappen.nl',
+        sourceUrl: url,
+        updatedAt: new Date().toISOString(),
+        detail: `Laagste 1-jaar-vast aanbod: ${best.provider}; inclusief belastingen, exclusief netbeheerkosten`,
+        dataStatus: 'verified',
+        statusMessage: 'Rechtstreeks geselecteerd uit de actuele tabel met vaste contracten van één jaar.',
+      };
+    }
+  }
+
   const summaryPattern = isGas
     ? /De actuele gasprijs is vandaag\s*€\s*([0-9]+(?:[.,][0-9]+)?)\s*per\s*m[³3]\.\s*De laagste gasprijs is\s*€\s*([0-9]+(?:[.,][0-9]+)?)\s*per\s*m[³3]\.\s*Laatste update:\s*([^.]+)\./i
     : /De actuele stroomprijs is vandaag\s*€\s*([0-9]+(?:[.,][0-9]+)?)\s*per\s*kWh\.\s*De laagste stroomprijs is\s*€\s*([0-9]+(?:[.,][0-9]+)?)\s*per\s*kWh\.\s*Laatste update:\s*([^.]+)\./i;
@@ -1648,7 +1677,7 @@ async function getOverstappenReference(kind) {
     if (value !== null && lowest !== null) {
       return {
         id: isGas ? 'gaslichtGas' : 'gaslichtElectricity',
-        label: isGas ? 'Gas consumentenprijs (Overstappen.nl)' : 'Stroom consumentenprijs (Overstappen.nl)',
+        label: isGas ? 'Gas consumentenprijs (Overstappen.nl)' : 'Stroom consumentenprijs (1 jaar vast)',
         value,
         unit,
         source: 'Overstappen.nl',
@@ -1677,7 +1706,7 @@ async function getOverstappenReference(kind) {
     if (!isGas && (value <= 0.03 || value >= 2)) continue;
     return {
       id: isGas ? 'gaslichtGas' : 'gaslichtElectricity',
-      label: isGas ? 'Gas referentieprijs (Overstappen.nl)' : 'Stroom referentieprijs (Overstappen.nl)',
+      label: isGas ? 'Gas referentieprijs (Overstappen.nl)' : 'Stroom consumentenprijs (1 jaar vast)',
       value,
       unit,
       source: 'Overstappen.nl',
@@ -1742,7 +1771,7 @@ async function getOverstappenReference(kind) {
 
   return {
     id: isGas ? 'gaslichtGas' : 'gaslichtElectricity',
-    label: isGas ? 'Gas referentieprijs (Overstappen.nl)' : 'Stroom referentieprijs (Overstappen.nl)',
+    label: isGas ? 'Gas referentieprijs (Overstappen.nl)' : 'Stroom consumentenprijs (1 jaar vast)',
     value: price,
     unit,
     source: 'Overstappen.nl',
@@ -1791,7 +1820,7 @@ async function collectOverview() {
       }
     }, { id: 'nlGasConsumptionBreakdown', label: 'Gasconsumptie NL (laatste volledige dag)', value: null, unit: 'GWh/d', source: 'NED API', sourceUrl: 'https://api.ned.nl/v1/utilizations', updatedAt: new Date().toISOString(), detail: 'Bron tijdelijk niet bereikbaar', rows: [] }],
     [getTennetRegulation, { id: 'tennetRegulation', label: 'Regelvermogen TenneT (actueel)', value: null, unit: 'MW', source: 'TenneT API (Balance Delta High Res)', sourceUrl: 'https://api.tennet.eu/publications/v1/balance-delta-high-res/latest', updatedAt: new Date().toISOString(), detail: 'Bron tijdelijk niet bereikbaar' }],
-    [getOverstappenElectricityReference, { id: 'gaslichtElectricity', label: 'Stroom referentieprijs (Overstappen.nl)', value: null, unit: 'EUR/kWh', source: 'Overstappen.nl', sourceUrl: OVERSTAPPEN_POWER_URL, updatedAt: new Date().toISOString(), detail: 'Bron tijdelijk niet bereikbaar' }],
+    [getOverstappenElectricityReference, { id: 'gaslichtElectricity', label: 'Stroom consumentenprijs (1 jaar vast)', value: null, unit: 'EUR/kWh', source: 'Overstappen.nl', sourceUrl: OVERSTAPPEN_POWER_URL, updatedAt: new Date().toISOString(), detail: 'Bron tijdelijk niet bereikbaar' }],
     [getOverstappenGasReference, { id: 'gaslichtGas', label: 'Gas referentieprijs (Overstappen.nl)', value: null, unit: 'EUR/m3', source: 'Overstappen.nl', sourceUrl: OVERSTAPPEN_GAS_URL, updatedAt: new Date().toISOString(), detail: 'Bron tijdelijk niet bereikbaar' }],
   ];
 

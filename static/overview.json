@@ -1,18 +1,18 @@
 {
-  "generatedAt": "2026-07-22T09:27:57.762Z",
-  "durationMs": 11451,
+  "generatedAt": "2026-07-22T10:29:14.301Z",
+  "durationMs": 24671,
   "items": [
     {
       "id": "dayAheadPower24h",
       "label": "Stroomprijs vandaag (day-ahead)",
-      "value": 43.227500000000006,
+      "value": 24,
       "unit": "EUR/MWh",
       "source": "ENTSO-E Transparency API (EPEX SPOT NL)",
       "sourceUrl": "https://web-api.tp.entsoe.eu/api",
-      "updatedAt": "2026-07-22T09:27:46.556Z",
-      "detail": "24 leveringsuren van vandaag; gisteren vastgesteld, kwartierprijzen gemiddeld per uur",
-      "dataStatus": "verified",
-      "statusMessage": "96 ENTSO-E-prijspunten gecontroleerd",
+      "updatedAt": "2026-07-22T10:26:12.832Z",
+      "detail": "24 leveringsuren van vandaag; gisteren vastgesteld, kwartierprijzen gemiddeld per uur | tijdelijke bronstoring, laatste geldige waarde getoond | fout: fetch failed",
+      "dataStatus": "stale",
+      "statusMessage": "Bron tijdelijk niet beschikbaar; dit is de laatste geldige meting.",
       "rows": [
         {
           "hour": "Vandaag 00:00",
@@ -187,11 +187,14 @@
     {
       "id": "ttfGas",
       "label": "TTF Gas",
-      "value": 61.7374,
+      "value": 62.2182,
       "unit": "EUR/MWh",
       "source": "TradingEconomics",
       "sourceUrl": "https://tradingeconomics.com/commodity/eu-natural-gas",
-      "updatedAt": "2026-07-22T09:27:46.601Z"
+      "updatedAt": "2026-07-22T10:26:12.876Z",
+      "detail": "tijdelijke bronstoring, laatste geldige waarde getoond | fout: fetch failed",
+      "dataStatus": "stale",
+      "statusMessage": "Bron tijdelijk niet beschikbaar; dit is de laatste geldige meting."
     },
     {
       "id": "ttfStorageSpread",
@@ -202,9 +205,9 @@
       "source": "ICE TTF vertraagde slotprijzen",
       "sourceUrl": "https://www.ice.com/products/82843860/ICE-Futures-Europe-Dutch-TTF-Natural-Gas-Futures/data",
       "updatedAt": "2026-07-21T00:00:00.000Z",
-      "detail": "Winter 26/27 (okt–mrt) minus Month-Ahead Aug26; exclusief opslagkosten, gasverlies en financiering",
-      "dataStatus": "verified",
-      "statusMessage": "Zeven TTF-maandcontracten zijn vergeleken op exact hetzelfde ICE-slotmoment.",
+      "detail": "Winter 26/27 (okt–mrt) minus Month-Ahead Aug26; exclusief opslagkosten, gasverlies en financiering | tijdelijke bronstoring, laatste geldige waarde getoond | fout: fetch failed",
+      "dataStatus": "stale",
+      "statusMessage": "Bron tijdelijk niet beschikbaar; dit is de laatste geldige meting.",
       "rows": [
         {
           "hour": "Nu kopen · Month-Ahead Aug26",
@@ -252,34 +255,36 @@
     {
       "id": "ets",
       "label": "EU ETS (ICE EUA frontcontract)",
-      "value": 84.67,
+      "value": 84.56,
       "unit": "EUR/tCO2",
       "source": "Barchart",
       "sourceUrl": "https://www.barchart.com/futures/quotes/CK*0",
-      "updatedAt": "2026-07-22T09:27:48.270Z",
-      "detail": "Doorlopend EUA-frontcontract CKZ26 | laatste handel 04:17 CT"
+      "updatedAt": "2026-07-22T10:26:14.875Z",
+      "detail": "Doorlopend EUA-frontcontract CKZ26 | laatste handel 05:16 CT | tijdelijke bronstoring, laatste geldige waarde getoond | fout: fetch failed",
+      "dataStatus": "stale",
+      "statusMessage": "Bron tijdelijk niet beschikbaar; dit is de laatste geldige meting."
     },
     {
       "id": "nlGasImport",
       "label": "Gasbalans Nederland",
-      "value": 7.615980000000036,
+      "value": -14.622392999999875,
       "unit": "GWh/d",
       "source": "ENTSOG API",
       "sourceUrl": "https://transparency.entsog.eu/api/v1/operationaldatas?operatorKey=NL-TSO-0001&indicator=Physical+Flow&from=2026-07-18&to=2026-07-22&limit=6000",
-      "updatedAt": "2026-07-21T04:00:00.000Z",
-      "detail": "Gasdag 2026-07-21 | grenssaldo 120.8 | netto aanvoer 355.9 | verbruik 348.2 GWh/d",
-      "dataStatus": "verified",
-      "statusMessage": "70 ENTSOG-metingen; VIP-corridors voorkomen dubbeltelling; aanvoer 355.9 vs. verbruik 348.2 GWh/d; verschil 2.2%",
+      "updatedAt": "2026-07-20T04:00:00.000Z",
+      "detail": "Gasdag 2026-07-20 | grenssaldo 155.2 | netto aanvoer 313.7 | verbruik 328.4 GWh/d",
+      "dataStatus": "stale",
+      "statusMessage": "Bron tijdelijk niet beschikbaar; dit is de laatste geldige meting.; aanvoer 313.7 vs. verbruik 328.4 GWh/d; verschil -4.5%",
       "rows": [
         {
           "hour": "Belgie",
-          "value": 6.430644000000001,
+          "value": 4.9407250000000005,
           "unit": "GWh/d",
           "kind": "border"
         },
         {
           "hour": "Duitsland",
-          "value": -375.454745,
+          "value": -365.994925,
           "unit": "GWh/d",
           "kind": "border"
         },
@@ -291,66 +296,66 @@
         },
         {
           "hour": "Noorwegen",
-          "value": 489.815257,
+          "value": 516.224903,
           "unit": "GWh/d",
           "kind": "border"
         },
         {
           "hour": "LNG-terminals",
-          "value": 396.128615,
+          "value": 338.379342,
           "unit": "GWh/d",
           "kind": "supply"
         },
         {
           "hour": "Gasopslag (4 sites)",
-          "value": -441.88196600000003,
+          "value": -458.62535399999996,
           "unit": "GWh/d",
           "kind": "storage"
         },
         {
           "hour": "Nationale productie",
-          "value": 280.827583,
+          "value": 278.807221,
           "unit": "GWh/d",
           "kind": "supply",
-          "updatedAt": "2026-07-21T04:00:00.000Z"
+          "updatedAt": "2026-07-20T04:00:00.000Z"
         },
         {
           "hour": "Binnenlands verbruik",
-          "value": -348.249408,
+          "value": -328.35430499999995,
           "unit": "GWh/d",
           "kind": "consumption",
-          "updatedAt": "2026-07-21T04:00:00.000Z"
+          "updatedAt": "2026-07-20T04:00:00.000Z"
         }
       ],
       "quality": {
-        "borderNetGwhDay": 120.791156,
-        "supplyGwhDay": 355.86538800000005,
-        "consumptionGwhDay": 348.249408,
-        "differenceGwhDay": 7.615980000000036,
-        "differencePct": 2.1869326479946336,
+        "borderNetGwhDay": 155.170703,
+        "supplyGwhDay": 313.7319120000001,
+        "consumptionGwhDay": 328.35430499999995,
+        "differenceGwhDay": -14.622392999999875,
+        "differencePct": -4.453236268670172,
         "storageFillPct": 33.4
       }
     },
     {
       "id": "nlGasProduction",
-      "label": "Gaswinning NL (laatste dag)",
-      "value": 280.827583,
+      "label": "Gaswinning NL (zelfde gasdag)",
+      "value": 278.807221,
       "unit": "GWh/d",
       "source": "ENTSOG API",
       "sourceUrl": "https://transparency.entsog.eu/api/v1/operationaldatas?operatorKey=NL-TSO-0001&indicator=Allocation&from=2026-07-17&to=2026-07-22&limit=5000",
-      "updatedAt": "2026-07-21T04:00:00.000Z",
-      "detail": "Lokale productie op gasdag 2026-07-21 (ENTSOG Allocation)",
-      "dataStatus": "verified",
-      "statusMessage": "2 productiemetingen gecontroleerd",
+      "updatedAt": "2026-07-20T04:00:00.000Z",
+      "detail": "Lokale productie op gasdag 2026-07-20 (ENTSOG Allocation) | tijdelijke bronstoring, laatste geldige waarde getoond | fout: fetch failed",
+      "dataStatus": "stale",
+      "statusMessage": "Bron tijdelijk niet beschikbaar; dit is de laatste geldige meting.",
       "rows": [
         {
           "hour": "Production (NL)",
-          "value": 269.405241,
+          "value": 267.431733,
           "unit": "GWh/d"
         },
         {
           "hour": "Production Green Gas (NL)",
-          "value": 11.422342,
+          "value": 11.375488,
           "unit": "GWh/d"
         }
       ]
@@ -358,54 +363,54 @@
     {
       "id": "nlCrossBorderFlows",
       "label": "Elektriciteitsstromen Nederland",
-      "value": 120.54520200000036,
+      "value": 146.900144,
       "unit": "MW",
       "source": "ENTSO-E Transparency API",
       "sourceUrl": "https://web-api.tp.entsoe.eu/api",
-      "updatedAt": "2026-07-22T03:00:00.000Z",
-      "detail": "netto import 0.1 GW | actuele systeembelasting 8.2 GW",
-      "dataStatus": "warning",
-      "statusMessage": "5 fysieke corridors; meetmomenten lopen 2.5 uur uiteen",
+      "updatedAt": "2026-07-22T04:00:00.000Z",
+      "detail": "netto import 0.1 GW | actuele systeembelasting 7.5 GW",
+      "dataStatus": "stale",
+      "statusMessage": "Bron tijdelijk niet beschikbaar; dit is de laatste geldige meting.",
       "rows": [
         {
           "hour": "Belgie",
-          "value": 2338.449,
+          "value": 1920.1065,
           "unit": "MW",
-          "updatedAt": "2026-07-22T03:00:00.000Z"
+          "updatedAt": "2026-07-22T04:00:00.000Z"
         },
         {
           "hour": "Duitsland",
-          "value": -2947.9934,
+          "value": -3336.71,
           "unit": "MW",
           "updatedAt": "2026-07-22T05:30:00.000Z"
         },
         {
           "hour": "Verenigd Koninkrijk",
-          "value": 1073.93,
+          "value": 1071.54,
           "unit": "MW",
           "updatedAt": "2026-07-22T05:00:00.000Z"
         },
         {
           "hour": "Denemarken",
-          "value": -640.68,
+          "value": 468.14,
           "unit": "MW",
-          "updatedAt": "2026-07-22T03:00:00.000Z"
+          "updatedAt": "2026-07-22T09:15:00.000Z"
         },
         {
           "hour": "Noorwegen",
-          "value": 296.839602,
+          "value": 23.823644,
           "unit": "MW",
-          "updatedAt": "2026-07-22T03:00:00.000Z"
+          "updatedAt": "2026-07-22T04:00:00.000Z"
         }
       ],
       "quality": {
-        "borderNetMw": 120.54520200000036,
-        "loadMw": 8191.646,
-        "loadUpdatedAt": "2026-07-22T08:30:00.000Z",
-        "frequencyHz": 49.998,
-        "frequencyUpdatedAt": "2026-07-22T09:27:48.000Z",
-        "regulationMw": -130.5,
-        "regulationUpdatedAt": "2026-07-22T09:25:48Z"
+        "borderNetMw": 146.900144,
+        "loadMw": 7487.286,
+        "loadUpdatedAt": "2026-07-22T09:30:00.000Z",
+        "frequencyHz": 50.018,
+        "frequencyUpdatedAt": "2026-07-22T10:26:21.000Z",
+        "regulationMw": -44,
+        "regulationUpdatedAt": "2026-07-22T10:24:12Z"
       }
     },
     {
@@ -415,89 +420,146 @@
       "unit": "%",
       "source": "NED Website",
       "sourceUrl": "https://ned.nl/nl/gasopslagen-nederland",
-      "updatedAt": "2026-07-22T09:27:56.377Z",
-      "detail": "Actuele nationale vullingsgraad van NED",
+      "updatedAt": "2026-07-22T10:26:29.055Z",
+      "detail": "Actuele nationale vullingsgraad van NED | tijdelijke bronstoring, laatste geldige waarde getoond | fout: fetch failed",
       "rows": [
         {
           "hour": "Opslaginhoud",
           "value": 45684.52,
           "unit": "GWh"
         }
-      ]
+      ],
+      "dataStatus": "stale",
+      "statusMessage": "Bron tijdelijk niet beschikbaar; dit is de laatste geldige meting."
     },
     {
       "id": "nlElectricityOverview",
       "label": "Elektriciteit NL (actuele load)",
-      "value": 8191.646,
+      "value": 7487.286,
       "unit": "MW",
       "source": "ENTSO-E Transparency API",
       "sourceUrl": "https://web-api.tp.entsoe.eu/api",
-      "updatedAt": "2026-07-22T08:30:00.000Z",
-      "detail": "Actuele load uit ENTSO-E",
-      "rows": []
+      "updatedAt": "2026-07-22T09:30:00.000Z",
+      "detail": "Actuele load uit ENTSO-E | tijdelijke bronstoring, laatste geldige waarde getoond | fout: fetch failed",
+      "rows": [],
+      "dataStatus": "stale",
+      "statusMessage": "Bron tijdelijk niet beschikbaar; dit is de laatste geldige meting."
     },
     {
       "id": "nlGridFrequency",
       "label": "Netfrequentie NL (actueel)",
-      "value": 49.998,
+      "value": 50.018,
       "unit": "Hz",
       "source": "mainsfrequency.com",
       "sourceUrl": "https://mainsfrequency.com/",
-      "updatedAt": "2026-07-22T09:27:48.000Z",
-      "detail": "Europese synchrone netfrequentie; afwijking -2 mHz",
-      "dataStatus": "verified",
-      "statusMessage": "Rechtstreeks uit het live meetbestand; niet uit de statische 50 Hz-doelwaarde"
+      "updatedAt": "2026-07-22T10:26:21.000Z",
+      "detail": "Europese synchrone netfrequentie; afwijking +18 mHz | tijdelijke bronstoring, laatste geldige waarde getoond | fout: fetch failed",
+      "dataStatus": "stale",
+      "statusMessage": "Bron tijdelijk niet beschikbaar; dit is de laatste geldige meting."
     },
     {
       "id": "nlGasConsumptionBreakdown",
       "label": "Gasconsumptie NL (laatste volledige dag)",
-      "value": 348.249408,
+      "value": 328.35430499999995,
       "unit": "GWh/d",
       "source": "ENTSOG API (fallback)",
       "sourceUrl": "https://transparency.entsog.eu/api/v1/operationaldatas?operatorKey=NL-TSO-0001&indicator=Allocation&from=2026-07-16&to=2026-07-22&limit=6000",
-      "updatedAt": "2026-07-21T04:00:00.000Z",
-      "detail": "Gasdag 2026-07-21; ENTSOG exits naar distributie, industrie en gascentrales",
-      "dataStatus": "verified",
-      "statusMessage": "6 verbruikspunten op dezelfde gasdag; aanvoer 355.9 vs. verbruik 348.2 GWh/d; verschil 2.2%",
+      "updatedAt": "2026-07-20T04:00:00.000Z",
+      "detail": "Gasdag 2026-07-20; ENTSOG exits naar distributie, industrie en gascentrales | tijdelijke bronstoring, laatste geldige waarde getoond | fout: fetch failed",
+      "dataStatus": "stale",
+      "statusMessage": "Bron tijdelijk niet beschikbaar; dit is de laatste geldige meting.; aanvoer 313.7 vs. verbruik 328.4 GWh/d; verschil -4.5%",
       "rows": []
     },
     {
       "id": "tennetRegulation",
       "label": "Regelvermogen TenneT (actueel)",
-      "value": -130.5,
+      "value": -44,
       "unit": "MW",
       "source": "TenneT API (Balance Delta High Res)",
       "sourceUrl": "https://api.tennet.eu/publications/v1/balance-delta-high-res/latest",
-      "updatedAt": "2026-07-22T09:25:48Z",
-      "detail": "Opregelen 21.0 MW | afregelen 151.5 MW | netto afregelen",
-      "dataStatus": "verified",
-      "statusMessage": "Positief = netto opregelen; negatief = netto afregelen"
+      "updatedAt": "2026-07-22T10:24:12Z",
+      "detail": "Opregelen 30.0 MW | afregelen 74.0 MW | netto afregelen | tijdelijke bronstoring, laatste geldige waarde getoond | fout: fetch failed",
+      "dataStatus": "stale",
+      "statusMessage": "Bron tijdelijk niet beschikbaar; dit is de laatste geldige meting."
     },
     {
       "id": "gaslichtElectricity",
-      "label": "Stroom consumentenprijs (Overstappen.nl)",
-      "value": 0.25,
+      "label": "Stroom consumentenprijs (1 jaar vast)",
+      "value": null,
       "unit": "EUR/kWh",
       "source": "Overstappen.nl",
       "sourceUrl": "https://www.overstappen.nl/energie/stroomprijs/",
-      "updatedAt": "2026-07-22T12:00:00.000Z",
-      "detail": "Actuele gemiddelde prijs inclusief belastingen; laagste aanbod € 0,24 | bronupdate 22 juli 2026",
-      "dataStatus": "verified",
-      "statusMessage": "Rechtstreeks uit de actuele prijssamenvatting van de bron"
+      "updatedAt": "2026-07-22T10:29:13.694Z",
+      "detail": "Bron tijdelijk niet bereikbaar | fout: fetch failed"
     },
     {
       "id": "gaslichtGas",
-      "label": "Gas consumentenprijs (Overstappen.nl)",
-      "value": 1.38,
+      "label": "Gas referentieprijs (Overstappen.nl)",
+      "value": null,
       "unit": "EUR/m3",
       "source": "Overstappen.nl",
       "sourceUrl": "https://www.overstappen.nl/energie/gasprijzen/",
-      "updatedAt": "2026-07-22T12:00:00.000Z",
-      "detail": "Actuele gemiddelde prijs inclusief belastingen; laagste aanbod € 1,25 | bronupdate 22 juli 2026",
-      "dataStatus": "verified",
-      "statusMessage": "Rechtstreeks uit de actuele prijssamenvatting van de bron"
+      "updatedAt": "2026-07-22T10:29:14.300Z",
+      "detail": "Bron tijdelijk niet bereikbaar | fout: fetch failed"
     }
   ],
-  "errors": [],
+  "errors": [
+    {
+      "source": "getDayAheadPower24h",
+      "error": "fetch failed"
+    },
+    {
+      "source": "getTTFGas",
+      "error": "fetch failed"
+    },
+    {
+      "source": "getTtfStorageSpread",
+      "error": "fetch failed"
+    },
+    {
+      "source": "getETSPrice",
+      "error": "fetch failed"
+    },
+    {
+      "source": "getNlGasImport",
+      "error": "fetch failed"
+    },
+    {
+      "source": "getNlGasProduction",
+      "error": "fetch failed"
+    },
+    {
+      "source": "getEntsoeCrossBorderFlows",
+      "error": "No ENTSO-E cross-border rows"
+    },
+    {
+      "source": "getNlGasStorage",
+      "error": "fetch failed"
+    },
+    {
+      "source": "getEntsoeElectricityOverview",
+      "error": "fetch failed"
+    },
+    {
+      "source": "getGridFrequency",
+      "error": "fetch failed"
+    },
+    {
+      "source": "",
+      "error": "fetch failed"
+    },
+    {
+      "source": "getTennetRegulation",
+      "error": "fetch failed"
+    },
+    {
+      "source": "getOverstappenElectricityReference",
+      "error": "fetch failed"
+    },
+    {
+      "source": "getOverstappenGasReference",
+      "error": "fetch failed"
+    }
+  ],
   "note": "Data is fetched from public APIs/sources and may lag or change format."
 }
