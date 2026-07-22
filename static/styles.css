@@ -181,9 +181,83 @@ button:hover { filter: brightness(1.05); }
   flex-direction: column;
 }
 
-#page-electricity .card[data-card-id="dayAheadPower24h"] .dayahead-chart {
+#page-electricity .card[data-card-id="dayAheadPower24h"] .card-meta,
+#page-electricity .card[data-card-id="dayAheadPower24h"] .card-source {
+  display: none;
+}
+
+#page-electricity .card[data-card-id="dayAheadPower24h"] .dayahead-chart-panel {
   flex: 1;
+  min-height: 82px;
+}
+
+.dayahead-chart-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(132px, 0.16fr);
+  gap: 0.5rem;
+  align-items: stretch;
+  margin-top: 0.28rem;
+  border-top: 1px solid var(--line);
+  padding-top: 0.28rem;
+}
+
+.dayahead-chart-panel .dayahead-chart {
+  margin-top: 0;
+  border-top: 0;
+  padding-top: 0;
   min-height: 0;
+}
+
+.dayahead-extremes {
+  display: grid;
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+  gap: 0.34rem;
+  min-height: 0;
+}
+
+.dayahead-extreme {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0;
+  padding: 0.42rem 0.5rem;
+  border: 1px solid rgba(15, 122, 98, 0.2);
+  border-radius: 11px;
+  background: #edf7f3;
+}
+
+.dayahead-extreme.is-high {
+  border-color: rgba(197, 82, 63, 0.22);
+  background: #fff2ef;
+}
+
+.dayahead-extreme-label {
+  color: #52645e;
+  font-size: 0.62rem;
+  font-weight: 850;
+  letter-spacing: 0.055em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.dayahead-extreme-value {
+  margin-top: 0.2rem;
+  color: #0b6c58;
+  font-size: 0.78rem;
+  line-height: 1.08;
+  white-space: nowrap;
+}
+
+.dayahead-extreme.is-high .dayahead-extreme-value {
+  color: #a34233;
+}
+
+.dayahead-extreme-time {
+  margin-top: 0.18rem;
+  color: var(--muted);
+  font-size: 0.66rem;
+  font-weight: 750;
+  line-height: 1;
 }
 
 #page-gas.page-panel.active {
@@ -685,6 +759,13 @@ html.mode-widget .mix-embed {
   }
   #page-electricity .card[data-card-id="nlCrossBorderFlows"] {
     grid-column: auto;
+  }
+  .dayahead-chart-panel {
+    grid-template-columns: 1fr;
+  }
+  .dayahead-extremes {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: auto;
   }
   .cards { grid-template-columns: 1fr; }
 }

@@ -1,5 +1,5 @@
 const urlParams = new URLSearchParams(window.location.search);
-const BUILD_TAG = "2026-07-22-09";
+const BUILD_TAG = "2026-07-22-10";
 const isLandscapeMode = urlParams.get("landscape") === "1";
 const isWidgetMode = urlParams.get("widget") === "1";
 const initialPageParamRaw = urlParams.get("page");
@@ -225,6 +225,53 @@ function createDayAheadChart(rows) {
   svg.appendChild(poly);
 
   return svg;
+}
+
+function createDayAheadChartPanel(rows) {
+  const chart = createDayAheadChart(rows);
+  const valid = (rows || [])
+    .map((row) => ({ row, value: Number(row?.value) }))
+    .filter((point) => Number.isFinite(point.value));
+  if (!chart || valid.length === 0) return chart;
+
+  const lowest = valid.reduce((best, point) => (point.value < best.value ? point : best));
+  const highest = valid.reduce((best, point) => (point.value > best.value ? point : best));
+  const formatPrice = (value) => Number(value).toLocaleString("nl-NL", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+
+  const panel = document.createElement("div");
+  panel.className = "dayahead-chart-panel";
+  panel.appendChild(chart);
+
+  const extremes = document.createElement("div");
+  extremes.className = "dayahead-extremes";
+  const addExtreme = (label, point, tone) => {
+    const block = document.createElement("div");
+    block.className = `dayahead-extreme ${tone}`;
+    block.setAttribute("aria-label", `${label} day-aheadprijs ${formatPrice(point.value)} euro per megawattuur om ${extractHourLabel(point.row?.hour)}`);
+
+    const title = document.createElement("span");
+    title.className = "dayahead-extreme-label";
+    title.textContent = label;
+    block.appendChild(title);
+
+    const value = document.createElement("strong");
+    value.className = "dayahead-extreme-value";
+    value.textContent = `${formatPrice(point.value)} EUR/MWh`;
+    block.appendChild(value);
+
+    const time = document.createElement("span");
+    time.className = "dayahead-extreme-time";
+    time.textContent = `om ${extractHourLabel(point.row?.hour)}`;
+    block.appendChild(time);
+    extremes.appendChild(block);
+  };
+  addExtreme("Laagste", lowest, "is-low");
+  addExtreme("Hoogste", highest, "is-high");
+  panel.appendChild(extremes);
+  return panel;
 }
 
 function createElectricityCountryMap(rows, quality = {}) {
@@ -1135,8 +1182,8 @@ function createCard(item) {
   if (item.id === "nlGasImport") cardEl.classList.add("card-wide");
 
   if (item.id === "dayAheadPower24h" && Array.isArray(item.rows) && item.rows.length > 0) {
-    const chart = createDayAheadChart(orderDayAheadRowsForDisplay(item.rows));
-    if (chart) cardEl.appendChild(chart);
+    const chartPanel = createDayAheadChartPanel(orderDayAheadRowsForDisplay(item.rows));
+    if (chartPanel) cardEl.appendChild(chartPanel);
   }
 
   if (item.id === "nlCrossBorderFlows" && Array.isArray(item.rows) && item.rows.length > 0) {
