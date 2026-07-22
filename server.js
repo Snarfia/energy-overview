@@ -373,6 +373,129 @@ async function getTTFGas() {
   };
 }
 
+const ICE_TTF_PRODUCT_URL = 'https://www.ice.com/products/82843860/ICE-Futures-Europe-Dutch-TTF-Natural-Gas-Futures/data';
+const ICE_TTF_CONTRACTS_URL = 'https://www.ice.com/marketdata/api/productguide/charting/contract-data?productId=28456&hubId=29327';
+const ICE_MONTH_CODES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+function iceTtfContractCode(year, monthIndex) {
+  return `${ICE_MONTH_CODES[monthIndex]}${String(year).slice(-2)}`;
+}
+
+function parseIceBarTimestamp(raw) {
+  const text = String(raw || '').trim();
+  if (!text) return null;
+  const includesTimezone = /(?:Z|GMT|UTC|[+-]\d{2}:?\d{2})$/i.test(text);
+  const parsed = new Date(includesTimezone ? text : `${text} UTC`);
+  return Number.isFinite(parsed.getTime()) ? parsed : null;
+}
+
+async function getIceTtfSettlementSeries(marketId) {
+  const url = `https://www.ice.com/marketdata/api/productguide/charting/data/historical?${query({ marketId, historicalSpan: 1 })}`;
+  const payload = await fetchJson(url, { accept: 'application/json' });
+  const bars = Array.isArray(payload?.bars) ? payload.bars : [];
+  const byTimestamp = new Map();
+  for (const bar of bars) {
+    if (!Array.isArray(bar) || bar.length < 2) continue;
+    const measuredAt = parseIceBarTimestamp(bar[0]);
+    const value = toNumber(bar[1]);
+    if (!measuredAt || value === null) continue;
+    byTimestamp.set(measuredAt.getTime(), value);
+  }
+  if (!byTimestamp.size) throw new Error(`Geen ICE-slotprijzen voor markt ${marketId}`);
+  return byTimestamp;
+}
+
+async function getTtfStorageSpread() {
+  const now = new Date();
+  const monthAheadDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
+  const monthAheadCode = iceTtfContractCode(monthAheadDate.getUTCFullYear(), monthAheadDate.getUTCMonth());
+
+  // Use the next complete storage winter: October through March.
+  const winterStartYear = now.getUTCMonth() <= 8 ? now.getUTCFullYear() : now.getUTCFullYear() + 1;
+  const winterMonths = [
+    { year: winterStartYear, month: 9 },
+    { year: winterStartYear, month: 10 },
+    { year: winterStartYear, month: 11 },
+    { year: winterStartYear + 1, month: 0 },
+    { year: winterStartYear + 1, month: 1 },
+    { year: winterStartYear + 1, month: 2 },
+  ];
+  const wanted = [
+    { year: monthAheadDate.getUTCFullYear(), month: monthAheadDate.getUTCMonth(), code: monthAheadCode, role: 'monthAhead' },
+    ...winterMonths.map(({ year, month }) => ({ year, month, code: iceTtfContractCode(year, month), role: 'winter' })),
+  ];
+
+  const markets = await fetchJson(ICE_TTF_CONTRACTS_URL, { accept: 'application/json' });
+  if (!Array.isArray(markets)) throw new Error('Ongeldige ICE-contractlijst');
+  const marketByCode = new Map(markets.map((market) => [String(market?.marketStrip || ''), market]));
+  const missing = wanted.filter((contract) => !marketByCode.has(contract.code));
+  if (missing.length) throw new Error(`ICE-contract(en) ontbreken: ${missing.map((contract) => contract.code).join(', ')}`);
+
+  const contracts = await Promise.all(wanted.map(async (contract) => {
+    const market = marketByCode.get(contract.code);
+    const series = await getIceTtfSettlementSeries(market.marketId);
+    return { ...contract, marketId: market.marketId, series };
+  }));
+
+  let commonTimestamps = [...contracts[0].series.keys()];
+  for (const contract of contracts.slice(1)) {
+    commonTimestamps = commonTimestamps.filter((timestamp) => contract.series.has(timestamp));
+  }
+  if (!commonTimestamps.length) throw new Error('Geen gelijk ICE-slotmoment voor alle zeven termijncontracten');
+  const measuredTimestamp = Math.max(...commonTimestamps);
+  const priced = contracts.map((contract) => ({ ...contract, price: contract.series.get(measuredTimestamp) }));
+  const monthAhead = priced.find((contract) => contract.role === 'monthAhead');
+  const winter = priced.filter((contract) => contract.role === 'winter');
+  if (!monthAhead || winter.length !== 6) throw new Error('Onvolledige TTF-zomer/wintervergelijking');
+
+  // A season is a base-load strip. Weight the monthly prices by delivery hours.
+  const winterHours = winter.reduce((sum, contract) => {
+    const days = new Date(Date.UTC(contract.year, contract.month + 1, 0)).getUTCDate();
+    return sum + days * 24;
+  }, 0);
+  const winterPrice = winter.reduce((sum, contract) => {
+    const days = new Date(Date.UTC(contract.year, contract.month + 1, 0)).getUTCDate();
+    return sum + contract.price * days * 24;
+  }, 0) / winterHours;
+  const spread = winterPrice - monthAhead.price;
+  const winterLabel = `${String(winterStartYear).slice(-2)}/${String(winterStartYear + 1).slice(-2)}`;
+  const formatPrice = (value, signed = false) => {
+    const sign = signed && value > 0 ? '+' : signed && value < 0 ? '\u2212' : '';
+    return `${sign}${Math.abs(value).toLocaleString('nl-NL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} EUR/MWh`;
+  };
+  const verdict = spread > 0
+    ? `Mogelijk · ${formatPrice(spread, true)} bruto`
+    : spread < 0
+      ? `Niet opslaan · ${formatPrice(spread, true)}`
+      : 'Neutraal · 0,00 EUR/MWh';
+
+  return {
+    id: 'ttfStorageSpread',
+    label: 'Zomer–winterspread opslag',
+    value: spread,
+    valueText: verdict,
+    unit: 'EUR/MWh',
+    source: 'ICE TTF vertraagde slotprijzen',
+    sourceUrl: ICE_TTF_PRODUCT_URL,
+    updatedAt: new Date(measuredTimestamp).toISOString(),
+    detail: `Winter ${winterLabel} (okt–mrt) minus Month-Ahead ${monthAheadCode}; exclusief opslagkosten, gasverlies en financiering`,
+    dataStatus: 'verified',
+    statusMessage: 'Zeven TTF-maandcontracten zijn vergeleken op exact hetzelfde ICE-slotmoment.',
+    rows: [
+      { hour: `Nu kopen · Month-Ahead ${monthAheadCode}`, valueText: formatPrice(monthAhead.price) },
+      { hour: `In winter · okt–mrt ${winterLabel}`, valueText: formatPrice(winterPrice) },
+    ],
+    quality: {
+      monthAheadContract: monthAheadCode,
+      monthAheadPrice: monthAhead.price,
+      winterContracts: winter.map((contract) => ({ code: contract.code, price: contract.price })),
+      winterPrice,
+      spread,
+      winterHours,
+    },
+  };
+}
+
 async function getETSPrice() {
   const sourceUrl = 'https://www.barchart.com/futures/quotes/CK*0';
   const html = await fetchText(sourceUrl);
@@ -1652,6 +1775,7 @@ async function collectOverview() {
   const tasks = [
     [getDayAheadPower24h, { id: 'dayAheadPower24h', label: 'Stroomprijs vandaag (day-ahead)', value: null, unit: 'EUR/MWh', source: 'ENTSO-E Transparency API (EPEX SPOT NL)', sourceUrl: ENTSOE_BASE, updatedAt: new Date().toISOString(), detail: 'Bron tijdelijk niet bereikbaar', rows: fallbackRows24 }],
     [getTTFGas, { id: 'ttfGas', label: 'TTF Gas', value: null, unit: 'EUR/MWh', source: 'TradingEconomics', sourceUrl: 'https://tradingeconomics.com/commodity/eu-natural-gas', updatedAt: new Date().toISOString(), detail: 'Bron tijdelijk niet bereikbaar' }],
+    [getTtfStorageSpread, { id: 'ttfStorageSpread', label: 'Zomer–winterspread opslag', value: null, unit: 'EUR/MWh', source: 'ICE TTF vertraagde slotprijzen', sourceUrl: ICE_TTF_PRODUCT_URL, updatedAt: new Date().toISOString(), detail: 'Bron tijdelijk niet bereikbaar', rows: [] }],
     [getETSPrice, { id: 'ets', label: 'EU ETS (ICE EUA frontcontract)', value: null, unit: 'EUR/tCO2', source: 'Barchart', sourceUrl: 'https://www.barchart.com/futures/quotes/CK*0', updatedAt: new Date().toISOString(), detail: 'Bron tijdelijk niet bereikbaar' }],
     [getNlGasImport, { id: 'nlGasImport', label: 'Netto in- en uitstroom aardgas', value: null, unit: 'GWh/d', source: 'ENTSOG API', sourceUrl: ENTSOG_BASE, updatedAt: new Date().toISOString(), detail: 'Bron tijdelijk niet bereikbaar', rows: [{ hour: 'Belgie', value: null, unit: 'GWh/d' }, { hour: 'Duitsland', value: null, unit: 'GWh/d' }, { hour: 'Verenigd Koninkrijk', value: null, unit: 'GWh/d' }, { hour: 'Noorwegen', value: null, unit: 'GWh/d' }, { hour: 'LNG (Gate+EET)', value: null, unit: 'GWh/d' }, { hour: 'Gasopslag (4 sites)', value: null, unit: 'GWh/d' }, { hour: 'Nationale productie', value: null, unit: 'GWh/d' }] }],
     [getNlGasProduction, { id: 'nlGasProduction', label: 'Gaswinning NL (laatste dag)', value: null, unit: 'GWh/d', source: 'ENTSOG API', sourceUrl: ENTSOG_BASE, updatedAt: new Date().toISOString(), detail: 'Bron tijdelijk niet bereikbaar' }],

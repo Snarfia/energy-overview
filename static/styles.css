@@ -193,7 +193,7 @@ button:hover { filter: brightness(1.05); }
 #page-gas .block-wholesale .cards,
 #page-gas .block-retail .cards {
   flex: 1;
-  grid-template-rows: repeat(3, minmax(0, 1fr));
+  grid-template-rows: repeat(4, minmax(0, 1fr));
   overflow-y: auto;
   padding-right: 0.2rem;
 }
@@ -487,6 +487,41 @@ button:hover { filter: brightness(1.05); }
   letter-spacing: -0.02em;
 }
 
+#page-gas .card[data-card-id="ttfStorageSpread"] {
+  display: flex;
+  flex-direction: column;
+}
+
+#page-gas .card[data-card-id="ttfStorageSpread"] .card-heading { order: 1; }
+
+#page-gas .card[data-card-id="ttfStorageSpread"] .card-value {
+  order: 2;
+  color: #173f36;
+  font-size: 1.12rem;
+}
+
+#page-gas .card[data-card-id="ttfStorageSpread"] .card-explainer {
+  order: 3;
+  margin-bottom: 0.2rem;
+}
+
+#page-gas .card[data-card-id="ttfStorageSpread"] .card-meta {
+  order: 5;
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 1;
+}
+
+#page-gas .card[data-card-id="ttfStorageSpread"] .card-series {
+  order: 4;
+  margin-top: 0.22rem;
+}
+
+#page-gas .card[data-card-id="ttfStorageSpread"] .card-source {
+  display: none;
+}
+
 @media (min-width: 1500px) {
   #page-electricity.page-panel.active,
   #page-gas.page-panel.active {
@@ -499,7 +534,7 @@ button:hover { filter: brightness(1.05); }
   }
   #page-gas .block-wholesale .cards {
     grid-template-columns: 1fr;
-    grid-template-rows: repeat(3, minmax(0, 1fr));
+    grid-template-rows: repeat(4, minmax(0, 1fr));
     height: 100%;
   }
   #page-electricity .block-wholesale .card,

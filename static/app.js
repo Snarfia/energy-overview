@@ -1,5 +1,5 @@
 const urlParams = new URLSearchParams(window.location.search);
-const BUILD_TAG = "2026-07-22-08";
+const BUILD_TAG = "2026-07-22-09";
 const isLandscapeMode = urlParams.get("landscape") === "1";
 const isWidgetMode = urlParams.get("widget") === "1";
 const initialPageParamRaw = urlParams.get("page");
@@ -38,7 +38,7 @@ const ELECTRICITY_WHOLESALE_IDS = new Set(["ets", "gaslichtElectricity"]);
 const ELECTRICITY_RETAIL_IDS = new Set([]);
 
 const GAS_DEMAND_IDS = new Set(["nlGasImport"]);
-const GAS_WHOLESALE_IDS = new Set(["ttfGas", "ets", "gaslichtGas"]);
+const GAS_WHOLESALE_IDS = new Set(["ttfGas", "ttfStorageSpread", "ets", "gaslichtGas"]);
 const GAS_RETAIL_IDS = new Set([]);
 
 const CARD_EXPLANATIONS = {
@@ -55,6 +55,7 @@ const CARD_EXPLANATIONS = {
   nlGasStorage: "Vullingsgraad van de Nederlandse gasopslagen. De stroom naar of uit opslag staat apart op de stromenkaart.",
   nlGasProduction: "Binnenlandse gasproductie op exact dezelfde volledige gasdag als de balanskaart, inclusief groen gas waar beschikbaar.",
   ttfGas: "Europese groothandelsreferentie voor aardgas in EUR/MWh; exclusief belasting, transport en leveranciersmarge.",
+  ttfStorageSpread: "Winterprijs min Month-Ahead. Positief is bruto ruimte; opslaan loont pas als alle kosten en verliezen samen lager zijn.",
   gaslichtGas: "Consumentenreferentie per m³ inclusief belastingen; niet rechtstreeks vergelijkbaar met TTF in EUR/MWh.",
 };
 
@@ -1095,7 +1096,7 @@ function createCard(item) {
   const statusEl = node.querySelector(".data-status");
   const measuredAt = item.updatedAt ? new Date(item.updatedAt) : null;
   const ageHours = measuredAt && !Number.isNaN(measuredAt.getTime()) ? (Date.now() - measuredAt.getTime()) / 3_600_000 : null;
-  const isDailySource = ["nlGasImport", "nlGasConsumptionBreakdown", "nlGasProduction", "gaslichtGas", "gaslichtElectricity"].includes(item.id);
+  const isDailySource = ["nlGasImport", "nlGasConsumptionBreakdown", "nlGasProduction", "ttfStorageSpread", "gaslichtGas", "gaslichtElectricity"].includes(item.id);
   const staleLimitHours = isDailySource ? 72 : item.id === "tennetSettlement" ? 24 : item.id === "nlCrossBorderFlows" ? 12 : 3;
   const detailLower = String(item.detail || "").toLowerCase();
   if (item.dataStatus === "stale" || (Number.isFinite(ageHours) && ageHours > staleLimitHours)) {
@@ -1256,7 +1257,7 @@ function splitItems(items) {
     return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib);
   });
 
-  const gasWholesaleOrder = ["ttfGas", "ets", "gaslichtGas"];
+  const gasWholesaleOrder = ["ttfGas", "ttfStorageSpread", "ets", "gaslichtGas"];
   gas.wholesale.sort((a, b) => {
     const ia = gasWholesaleOrder.indexOf(a.id);
     const ib = gasWholesaleOrder.indexOf(b.id);
