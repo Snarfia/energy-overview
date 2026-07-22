@@ -224,7 +224,9 @@ function cachedItemWithError(cachedItem, err) {
   const next = { ...cachedItem };
   const msg = err ? `tijdelijke bronstoring, laatste geldige waarde getoond | fout: ${String(err.message || err)}` : 'tijdelijke bronstoring, laatste geldige waarde getoond';
   next.detail = String(next.detail || '').includes('tijdelijke bronstoring') ? String(next.detail || '') : (next.detail ? `${next.detail} | ${msg}` : msg);
-  next.updatedAt = new Date().toISOString();
+  // Keep the measurement timestamp. Overwriting it made stale data look current.
+  next.dataStatus = 'stale';
+  next.statusMessage = 'Bron tijdelijk niet beschikbaar; dit is de laatste geldige meting.';
   return next;
 }
 
@@ -357,20 +359,21 @@ async function getTTFGas() {
 }
 
 async function getETSPrice() {
-  const sourceUrl = 'https://www.barchart.com/futures/quotes/CKJ26';
+  const sourceUrl = 'https://www.barchart.com/futures/quotes/CK*0';
   const html = await fetchText(sourceUrl);
-  const m = html.match(/"symbol":"CKJ26"[\s\S]*?"lastPrice":"([^"]+)"[\s\S]*?"tradeTime":"([^"]+)"/);
+  const m = html.match(/"symbol":"(CK[A-Z]\d{2})"[\s\S]*?"lastPrice":"([^"]+)"[\s\S]*?"tradeTime":"([^"]+)"/);
   if (!m) throw new Error('Could not parse ETS price');
-  const value = toNumber(m[1]);
+  const value = toNumber(m[2]);
   if (value === null) throw new Error('No ETS numeric value');
   return {
     id: 'ets',
-    label: 'EU ETS (ICE EUA Futures)',
+    label: 'EU ETS (ICE EUA frontcontract)',
     value,
     unit: 'EUR/tCO2',
     source: 'Barchart',
     sourceUrl,
-    updatedAt: m[2] || new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    detail: `Doorlopend EUA-frontcontract ${m[1]} | laatste handel ${m[3]}`,
   };
 }
 
@@ -1025,18 +1028,37 @@ function entsogGwhDay(value, unit) {
   return v / 1_000_000;
 }
 
-function pickLatestCompleteGasDayTs(rows) {
-  const tsList = rows.map((r) => String(r.periodFrom || '')).filter(Boolean).sort();
-  if (!tsList.length) return null;
-  const now = new Date();
-  const todayUtc = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
-  const past = tsList.filter((ts) => {
-    const d = parseIsoUtc(ts);
-    if (!d) return false;
-    const dayUtc = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
-    return dayUtc < todayUtc;
-  });
-  return (past.length ? past[past.length - 1] : tsList[tsList.length - 1]);
+function selectLatestCompleteGasDay(rows, minNumericRows = 1) {
+  const today = new Date().toISOString().slice(0, 10);
+  const byDay = new Map();
+  for (const row of rows || []) {
+    const day = String(row?.periodFrom || '').slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) continue;
+    const bucket = byDay.get(day) || [];
+    bucket.push(row);
+    byDay.set(day, bucket);
+  }
+
+  const candidates = [...byDay.entries()]
+    .filter(([day]) => day < today)
+    .map(([day, dayRows]) => ({
+      day,
+      rows: dayRows,
+      numericRows: dayRows.filter((row) => entsogGwhDay(row?.value, row?.unit) !== null).length,
+    }))
+    .filter((candidate) => candidate.numericRows >= minNumericRows)
+    .sort((a, b) => a.day.localeCompare(b.day));
+
+  const selected = candidates.at(-1) || null;
+  if (!selected) return null;
+  const timestamps = selected.rows
+    .map((row) => parseIsoUtc(row?.periodFrom))
+    .filter(Boolean)
+    .sort((a, b) => a - b);
+  return {
+    ...selected,
+    updatedAt: timestamps.at(-1)?.toISOString() || `${selected.day}T00:00:00.000Z`,
+  };
 }
 
 async function getEntsogOperational(indicator, daysBack = 4, limit = 6000) {
@@ -1055,8 +1077,9 @@ async function getNlGasProduction() {
   const { rows, sourceUrl } = await getEntsogOperational('Allocation', 5, 5000);
   const prod = rows.filter((r) => String(r.directionKey || '').toLowerCase() === 'entry' && String(r.pointLabel || '').toLowerCase().includes('production'));
   if (!prod.length) throw new Error('No ENTSOG production rows');
-  const latestTs = pickLatestCompleteGasDayTs(prod) || prod.map((r) => String(r.periodFrom || '')).sort().at(-1);
-  const dayRows = prod.filter((r) => String(r.periodFrom || '') === latestTs);
+  const selected = selectLatestCompleteGasDay(prod, 1);
+  if (!selected) throw new Error('No complete ENTSOG production day');
+  const dayRows = selected.rows;
   const total = dayRows.reduce((s, r) => s + (entsogGwhDay(r.value, r.unit) || 0), 0);
   return {
     id: 'nlGasProduction',
@@ -1065,8 +1088,10 @@ async function getNlGasProduction() {
     unit: 'GWh/d',
     source: 'ENTSOG API',
     sourceUrl,
-    updatedAt: parseIsoUtc(latestTs)?.toISOString() || new Date().toISOString(),
-    detail: 'Lokale productie (ENTSOG Allocation)',
+    updatedAt: selected.updatedAt,
+    detail: `Lokale productie op gasdag ${selected.day} (ENTSOG Allocation)`,
+    dataStatus: 'verified',
+    statusMessage: `${selected.numericRows} productiemetingen gecontroleerd`,
     rows: dayRows.slice(0, 6).map((r) => ({ hour: String(r.pointLabel || 'Productie'), value: entsogGwhDay(r.value, r.unit), unit: 'GWh/d' })),
   };
 }
@@ -1078,61 +1103,51 @@ async function getNlGasImport() {
   ]);
 
   const meta = new Map();
-  for (const r of opRows) meta.set(String(r.pointKey || ''), r);
+  for (const r of opRows) meta.set(`${String(r.pointKey || '')}:${String(r.directionKey || '').toLowerCase()}`, r);
 
-  const latestTs = pickLatestCompleteGasDayTs(flowRows) || flowRows.map((r) => String(r.periodFrom || '')).filter(Boolean).sort().at(-1);
-  const rowsAtTs = flowRows.filter((r) => String(r.periodFrom || '') === latestTs);
+  // ENTSOG publishes several start times for the same gas day. Selecting one
+  // exact timestamp used to leave just one empty row and silently revive old data.
+  const selected = selectLatestCompleteGasDay(flowRows, 10);
+  if (!selected) throw new Error('No complete ENTSOG physical-flow gas day');
+  const rowsAtDay = selected.rows;
 
-  const normalizeCountryCode = (raw, pointLabel = '') => {
-    const txt = String(raw || '').trim().toUpperCase();
-    const lbl = String(pointLabel || '').toUpperCase();
-    const normalizedLabel = lbl.replace(/[^A-Z0-9]+/g, ' ').trim();
-    const words = new Set(normalizedLabel ? normalizedLabel.split(/\s+/) : []);
-
-    const exactRaw = {
-      BE: 'BE', BEL: 'BE', BELGIUM: 'BE', BELGIE: 'BE',
-      DE: 'DE', DEU: 'DE', GERMANY: 'DE', DUITSLAND: 'DE',
-      GB: 'GB', UK: 'GB', GBR: 'GB', 'UNITED KINGDOM': 'GB', 'VERENIGD KONINKRIJK': 'GB',
-      DK: 'DK', DNK: 'DK', DENMARK: 'DK', DENEMARKEN: 'DK', DANMARK: 'DK',
-      NO: 'NO', NOR: 'NO', NORWAY: 'NO', NOORWEGEN: 'NO',
-    };
-    if (exactRaw[txt]) return exactRaw[txt];
-
-    const hasPhrase = (phrase) => normalizedLabel.includes(phrase);
-    if (words.has('BELGIUM') || words.has('BELGIE')) return 'BE';
-    if (words.has('GERMANY') || words.has('DUITSLAND')) return 'DE';
-    if (words.has('DENMARK') || words.has('DENEMARKEN') || words.has('DANMARK')) return 'DK';
-    if (words.has('NORWAY') || words.has('NOORWEGEN')) return 'NO';
-    if (hasPhrase('UNITED KINGDOM') || hasPhrase('VERENIGD KONINKRIJK')) return 'GB';
-
-    return '';
-  };
+  // Prefer current virtual interconnection points (VIPs) for BE/DE. Adding VIPs
+  // to their underlying legacy points double-counts the same physical corridor.
+  const countryByPoint = new Map([
+    ['ITP-00555', 'BE'], // VIP BENE H
+    ['ITP-00648', 'BE'], // VIP BENE L
+    ['ITP-10010', 'DE'], // VIP TTF-THE L
+    ['ITP-10012', 'DE'], // VIP TTF-THE H
+    ['ITP-00063', 'GB'], // BBL; may legitimately be unavailable
+    ['ITP-00160', 'NO'], // Emden EPT
+    ['ITP-00161', 'NO'], // Emden NPT
+  ]);
 
   const countryMap = new Map();
-  let otherCrossBorderNet = 0;
-  let lng = 0;
-  let storage = 0;
-  for (const r of rowsAtTs) {
-    const m = meta.get(String(r.pointKey || '')) || {};
-    const pointType = String(m.pointType || '');
-    const rawCountry = String(m.adjacentCountry || m.adjacentCountryCode || r.adjacentCountry || '');
-    const label = String(m.pointLabel || '').toLowerCase();
+  let lngIn = 0;
+  let lngOut = 0;
+  let storageIn = 0;
+  let storageOut = 0;
+  for (const r of rowsAtDay) {
+    const pointKey = String(r.pointKey || '');
     const direction = String(r.directionKey || '').toLowerCase();
+    const m = meta.get(`${pointKey}:${direction}`) || {};
+    const pointType = String(m.pointType || '');
+    const label = String(m.pointLabel || '').toLowerCase();
     const val = entsogGwhDay(r.value, r.unit);
     if (val === null) continue;
 
-    if (pointType.includes('LNG') && direction === 'entry') lng += val;
+    if (pointType.includes('LNG')) {
+      if (direction === 'entry') lngIn += val;
+      if (direction === 'exit') lngOut += val;
+    }
     if ((pointType.includes('Storage') || pointType.includes('Cross-Border Storage')) && ['norg', 'grijpskerk', 'bergermeer', 'zuidwending'].some((k) => label.includes(k))) {
-      storage += direction === 'entry' ? val : -val;
+      if (direction === 'entry') storageIn += val;
+      if (direction === 'exit') storageOut += val;
     }
 
-    if (!pointType.includes('Cross-Border Transmission')) continue;
-    const country = normalizeCountryCode(rawCountry, m.pointLabel || r.pointLabel || '');
-    if (!country || country === 'NL') {
-      if (direction === 'entry') otherCrossBorderNet += val;
-      if (direction === 'exit') otherCrossBorderNet -= val;
-      continue;
-    }
+    const country = countryByPoint.get(pointKey);
+    if (!country) continue;
     const bucket = countryMap.get(country) || { in: 0, out: 0 };
     if (direction === 'entry') bucket.in += val;
     if (direction === 'exit') bucket.out += val;
@@ -1143,65 +1158,42 @@ async function getNlGasImport() {
     ['BE', 'Belgie'],
     ['DE', 'Duitsland'],
     ['GB', 'Verenigd Koninkrijk'],
-    ['DK', 'Denemarken'],
     ['NO', 'Noorwegen'],
   ];
   const rows = names.map(([code, name]) => {
     const c = countryMap.get(code);
-    return { hour: name, value: c ? c.in - c.out : null, unit: 'GWh/d' };
+    return { hour: name, value: c ? c.in - c.out : null, unit: 'GWh/d', kind: 'border' };
   });
-  rows.push({ hour: 'LNG (Gate+EET)', value: lng, unit: 'GWh/d' });
-  rows.push({ hour: 'Gasopslag (4 sites)', value: storage, unit: 'GWh/d' });
-  if (Math.abs(otherCrossBorderNet) > 0.0001) {
-    rows.push({ hour: 'Overig (onbekend land)', value: otherCrossBorderNet, unit: 'GWh/d' });
-  }
+  const lng = lngIn - lngOut;
+  const storage = storageIn - storageOut;
+  rows.push({ hour: 'LNG-terminals', value: lng, unit: 'GWh/d', kind: 'supply' });
+  rows.push({ hour: 'Gasopslag (4 sites)', value: storage, unit: 'GWh/d', kind: 'storage' });
   let productionValue = null;
+  let productionUpdatedAt = null;
   try {
     const prod = await getNlGasProduction();
     productionValue = toNumber(prod?.value);
+    productionUpdatedAt = prod?.updatedAt || null;
   } catch {
     productionValue = null;
   }
-  rows.push({ hour: 'Nationale productie', value: productionValue, unit: 'GWh/d' });
+  rows.push({ hour: 'Nationale productie', value: productionValue, unit: 'GWh/d', kind: 'supply', updatedAt: productionUpdatedAt });
 
-  // If country codes are missing in ENTSOG metadata, still show a useful net value.
-  if (rows.slice(0, 5).every((r) => r.value === null)) {
-    let net = 0;
-    for (const r of rowsAtTs) {
-      const direction = String(r.directionKey || '').toLowerCase();
-      const val = entsogGwhDay(r.value, r.unit);
-      if (val === null) continue;
-      if (direction === 'entry') net += val;
-      if (direction === 'exit') net -= val;
-    }
-    rows[1].value = net; // place fallback net on DE anchor to keep map readable
-  }
-
-  let total = rows.reduce((s, r) => s + (r.value || 0), 0);
-
-  const hasAnyCountry = rows.slice(0, 5).some((r) => r.value !== null && Math.abs(Number(r.value)) > 0.0001);
-  if (!hasAnyCountry || Math.abs(total) < 0.0001) {
-    const prev = getPreviousItemById('nlGasImport');
-    const prevTotal = toNumber(prev?.value);
-    if (prev && prevTotal !== null && Math.abs(prevTotal) > 0.0001) {
-      return {
-        ...prev,
-        detail: `${String(prev.detail || 'Positief = netto import naar NL, negatief = netto export uit NL')} | tijdelijke bronstoring, laatste niet-nul waarde getoond`,
-        updatedAt: new Date().toISOString(),
-      };
-    }
-  }
-
-  const unknownNote = Math.abs(otherCrossBorderNet) > 0.0001 ? ` | overig/onbekend land: ${Number(otherCrossBorderNet).toFixed(1)} GWh/d` : '';
+  const borderRows = rows.filter((row) => row.kind === 'border' && row.value !== null);
+  if (!borderRows.length) throw new Error('No canonical ENTSOG border-corridor values');
+  const borderNet = borderRows.reduce((sum, row) => sum + Number(row.value || 0), 0);
+  const supplyNet = borderNet + lng + storage + (productionValue || 0);
   return {
     id: 'nlGasImport',
-    label: 'Netto in- en uitstroom aardgas',
-    value: total,
+    label: 'Grensoverschrijdende gasstromen',
+    value: borderNet,
     unit: 'GWh/d',
     source: 'ENTSOG API',
     sourceUrl,
-    updatedAt: parseIsoUtc(latestTs)?.toISOString() || new Date().toISOString(),
-    detail: `Positief = netto instroom, negatief = netto uitstroom${unknownNote}`,
+    updatedAt: selected.updatedAt,
+    detail: `Gasdag ${selected.day} | grenssaldo ${borderNet.toFixed(1)} GWh/d | aanvoer incl. LNG, opslag en productie ${supplyNet.toFixed(1)} GWh/d`,
+    dataStatus: 'verified',
+    statusMessage: `${selected.numericRows} ENTSOG-metingen; VIP-corridors voorkomen dubbeltelling`,
     rows,
   };
 }
@@ -1379,8 +1371,9 @@ async function getNlGasConsumptionBreakdown() {
 
 async function getNlGasConsumptionBreakdownFallbackEntsog() {
   const { rows, sourceUrl } = await getEntsogOperational('Allocation', 6, 6000);
-  const latestTs = pickLatestCompleteGasDayTs(rows);
-  const dayRows = rows.filter((r) => String(r.periodFrom || '') === latestTs && String(r.directionKey || '').toLowerCase() === 'exit');
+  const selected = selectLatestCompleteGasDay(rows, 5);
+  if (!selected) throw new Error('No complete ENTSOG allocation gas day');
+  const dayRows = selected.rows.filter((r) => String(r.directionKey || '').toLowerCase() === 'exit');
   if (!dayRows.length) throw new Error('No ENTSOG exit rows for fallback consumption');
 
   const isDomesticConsumptionExit = (label) => {
@@ -1406,8 +1399,10 @@ async function getNlGasConsumptionBreakdownFallbackEntsog() {
     unit: 'GWh/d',
     source: 'ENTSOG API (fallback)',
     sourceUrl,
-    updatedAt: parseIsoUtc(latestTs)?.toISOString() || new Date().toISOString(),
-    detail: 'NED tijdelijk niet beschikbaar; ENTSOG exits gefilterd op local distribution/consumers/power plants',
+    updatedAt: selected.updatedAt,
+    detail: `Gasdag ${selected.day}; ENTSOG exits naar distributie, industrie en gascentrales`,
+    dataStatus: 'verified',
+    statusMessage: `${domesticRows.length} verbruikspunten op dezelfde gasdag`,
     rows: [],
   };
 }
@@ -1425,6 +1420,39 @@ async function getOverstappenReference(kind) {
       .replace(/<[^>]+>/g, ' ')
       .replace(/\s+/g, ' ')
   );
+
+  const dutchDateToIso = (label) => {
+    const months = {
+      januari: 0, februari: 1, maart: 2, april: 3, mei: 4, juni: 5,
+      juli: 6, augustus: 7, september: 8, oktober: 9, november: 10, december: 11,
+    };
+    const m = String(label || '').trim().toLowerCase().match(/(\d{1,2})\s+([a-z]+)\s+(\d{4})/);
+    if (!m || months[m[2]] === undefined) return new Date().toISOString();
+    return new Date(Date.UTC(Number(m[3]), months[m[2]], Number(m[1]), 12)).toISOString();
+  };
+
+  const summaryPattern = isGas
+    ? /De actuele gasprijs is vandaag\s*€\s*([0-9]+(?:[.,][0-9]+)?)\s*per\s*m[³3]\.\s*De laagste gasprijs is\s*€\s*([0-9]+(?:[.,][0-9]+)?)\s*per\s*m[³3]\.\s*Laatste update:\s*([^.]+)\./i
+    : /De actuele stroomprijs is vandaag\s*€\s*([0-9]+(?:[.,][0-9]+)?)\s*per\s*kWh\.\s*De laagste stroomprijs is\s*€\s*([0-9]+(?:[.,][0-9]+)?)\s*per\s*kWh\.\s*Laatste update:\s*([^.]+)\./i;
+  const summary = pageText.match(summaryPattern);
+  if (summary) {
+    const value = toNumber(summary[1]);
+    const lowest = toNumber(summary[2]);
+    if (value !== null && lowest !== null) {
+      return {
+        id: isGas ? 'gaslichtGas' : 'gaslichtElectricity',
+        label: isGas ? 'Gas consumentenprijs (Overstappen.nl)' : 'Stroom consumentenprijs (Overstappen.nl)',
+        value,
+        unit,
+        source: 'Overstappen.nl',
+        sourceUrl: url,
+        updatedAt: dutchDateToIso(summary[3]),
+        detail: `Actuele gemiddelde prijs inclusief belastingen; laagste aanbod € ${lowest.toFixed(2).replace('.', ',')} | bronupdate ${summary[3].trim()}`,
+        dataStatus: 'verified',
+        statusMessage: 'Rechtstreeks uit de actuele prijssamenvatting van de bron',
+      };
+    }
+  }
 
   const topRowPatterns = [
     /(?:^|\s)1\s*[.)-]?\s*([A-Z][A-Za-z0-9&'’\-\s]{2,40})\s+(Vast|Dynamisch)\s+([0-9]{1,2}\s*(?:jaar|maand))\s+€\s*([0-9]+(?:[.,][0-9]{2,4})?)/i,
@@ -1541,8 +1569,8 @@ async function collectOverview() {
   const tasks = [
     [getDayAheadPower24h, { id: 'dayAheadPower24h', label: 'EPEX SPOT Day-Ahead NL (24h vooruit)', value: null, unit: 'EUR/MWh', source: 'ENTSO-E Transparency API (EPEX SPOT NL)', sourceUrl: ENTSOE_BASE, updatedAt: new Date().toISOString(), detail: 'Bron tijdelijk niet bereikbaar', rows: fallbackRows24 }],
     [getTTFGas, { id: 'ttfGas', label: 'TTF Gas', value: null, unit: 'EUR/MWh', source: 'TradingEconomics', sourceUrl: 'https://tradingeconomics.com/commodity/eu-natural-gas', updatedAt: new Date().toISOString(), detail: 'Bron tijdelijk niet bereikbaar' }],
-    [getETSPrice, { id: 'ets', label: 'EU ETS (ICE EUA Futures)', value: null, unit: 'EUR/tCO2', source: 'Barchart', sourceUrl: 'https://www.barchart.com/futures/quotes/CKJ26', updatedAt: new Date().toISOString(), detail: 'Bron tijdelijk niet bereikbaar' }],
-    [getNlGasImport, { id: 'nlGasImport', label: 'Netto in- en uitstroom aardgas', value: null, unit: 'GWh/d', source: 'ENTSOG API', sourceUrl: ENTSOG_BASE, updatedAt: new Date().toISOString(), detail: 'Bron tijdelijk niet bereikbaar', rows: [{ hour: 'Belgie', value: null, unit: 'GWh/d' }, { hour: 'Duitsland', value: null, unit: 'GWh/d' }, { hour: 'Verenigd Koninkrijk', value: null, unit: 'GWh/d' }, { hour: 'Denemarken', value: null, unit: 'GWh/d' }, { hour: 'Noorwegen', value: null, unit: 'GWh/d' }, { hour: 'LNG (Gate+EET)', value: null, unit: 'GWh/d' }, { hour: 'Gasopslag (4 sites)', value: null, unit: 'GWh/d' }, { hour: 'Nationale productie', value: null, unit: 'GWh/d' }] }],
+    [getETSPrice, { id: 'ets', label: 'EU ETS (ICE EUA frontcontract)', value: null, unit: 'EUR/tCO2', source: 'Barchart', sourceUrl: 'https://www.barchart.com/futures/quotes/CK*0', updatedAt: new Date().toISOString(), detail: 'Bron tijdelijk niet bereikbaar' }],
+    [getNlGasImport, { id: 'nlGasImport', label: 'Netto in- en uitstroom aardgas', value: null, unit: 'GWh/d', source: 'ENTSOG API', sourceUrl: ENTSOG_BASE, updatedAt: new Date().toISOString(), detail: 'Bron tijdelijk niet bereikbaar', rows: [{ hour: 'Belgie', value: null, unit: 'GWh/d' }, { hour: 'Duitsland', value: null, unit: 'GWh/d' }, { hour: 'Verenigd Koninkrijk', value: null, unit: 'GWh/d' }, { hour: 'Noorwegen', value: null, unit: 'GWh/d' }, { hour: 'LNG (Gate+EET)', value: null, unit: 'GWh/d' }, { hour: 'Gasopslag (4 sites)', value: null, unit: 'GWh/d' }, { hour: 'Nationale productie', value: null, unit: 'GWh/d' }] }],
     [getNlGasProduction, { id: 'nlGasProduction', label: 'Gaswinning NL (laatste dag)', value: null, unit: 'GWh/d', source: 'ENTSOG API', sourceUrl: ENTSOG_BASE, updatedAt: new Date().toISOString(), detail: 'Bron tijdelijk niet bereikbaar' }],
     [getEntsoeCrossBorderFlows, { id: 'nlCrossBorderFlows', label: 'Cross-Border Physical Flows NL (live, netto)', value: null, unit: 'MW', source: 'ENTSO-E Transparency API', sourceUrl: ENTSOE_BASE, updatedAt: new Date().toISOString(), detail: 'Bron tijdelijk niet bereikbaar', rows: [{ hour: 'Belgie', value: null, unit: 'MW' }, { hour: 'Duitsland', value: null, unit: 'MW' }, { hour: 'Verenigd Koninkrijk', value: null, unit: 'MW' }, { hour: 'Denemarken', value: null, unit: 'MW' }, { hour: 'Noorwegen', value: null, unit: 'MW' }] }],
     [getNlGasStorage, { id: 'nlGasStorage', label: 'NL Gasopslag (actueel)', value: null, unit: '%', source: 'NED API', sourceUrl: 'https://api.ned.nl/v1/utilizations', updatedAt: new Date().toISOString(), detail: 'Bron tijdelijk niet bereikbaar' }],
@@ -1580,6 +1608,31 @@ async function collectOverview() {
     }
   }
   items.push(...staticFallbacks);
+
+  // Cross-check the gas balance using values that share the same GWh/day basis.
+  // A small difference is expected from linepack, measurement timing and points
+  // not represented in the compact country view.
+  const gasFlow = items.find((item) => item?.id === 'nlGasImport');
+  const gasConsumption = items.find((item) => item?.id === 'nlGasConsumptionBreakdown');
+  if (gasFlow && gasConsumption && Array.isArray(gasFlow.rows)) {
+    const supply = gasFlow.rows.reduce((sum, row) => {
+      const value = toNumber(row?.value);
+      return value === null ? sum : sum + value;
+    }, 0);
+    const consumption = toNumber(gasConsumption.value);
+    if (consumption !== null && consumption > 0) {
+      const difference = supply - consumption;
+      const differencePct = (difference / consumption) * 100;
+      const balanceMessage = `aanvoer ${supply.toFixed(1)} vs. verbruik ${consumption.toFixed(1)} GWh/d; verschil ${differencePct.toFixed(1)}%`;
+      gasFlow.quality = { supplyGwhDay: supply, consumptionGwhDay: consumption, differenceGwhDay: difference, differencePct };
+      gasFlow.statusMessage = `${gasFlow.statusMessage || 'Bron gecontroleerd'}; ${balanceMessage}`;
+      gasConsumption.statusMessage = `${gasConsumption.statusMessage || 'Bron gecontroleerd'}; ${balanceMessage}`;
+      if (Math.abs(differencePct) > 15) {
+        gasFlow.dataStatus = 'warning';
+        gasConsumption.dataStatus = 'warning';
+      }
+    }
+  }
 
   const cleanedItems = items.map((it) => ({ ...it, sourceUrl: sanitizeSourceUrl(it?.sourceUrl) }));
   return {

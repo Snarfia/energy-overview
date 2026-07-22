@@ -216,11 +216,32 @@ button:hover { filter: brightness(1.05); }
 }
 
 .card.card-wide { grid-column: 1 / -1; }
+.card-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.5rem; }
 .card-title { margin: 0; font-size: 0.94rem; color: #2e3935; line-height: 1.2; }
 .card-value { margin: 0.3rem 0 0.15rem; font-size: 1.28rem; font-weight: 700; line-height: 1.12; }
-.card-meta { margin: 0; color: var(--muted); font-size: 0.78rem; line-height: 1.2; }
+.card-explainer { margin: 0.24rem 0 0.3rem; color: #3e4e49; font-size: 0.72rem; line-height: 1.32; max-width: 78ch; }
+.card-meta { margin: 0; color: var(--muted); font-size: 0.67rem; line-height: 1.25; }
 .card-source { display: inline-block; margin-top: 0.33rem; color: var(--accent); text-decoration: none; font-weight: 600; font-size: 0.7rem; }
 .card-source:hover { text-decoration: underline; }
+
+.data-status {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.18rem 0.42rem;
+  border-radius: 999px;
+  font-size: 0.59rem;
+  line-height: 1;
+  font-weight: 800;
+  letter-spacing: 0.025em;
+  border: 1px solid transparent;
+}
+.data-status::before { content: ""; width: 0.38rem; height: 0.38rem; border-radius: 50%; background: currentColor; }
+.data-status.is-current,
+.data-status.is-verified { color: #0a6c57; background: #e7f5f0; border-color: #b8dfd4; }
+.data-status.is-warning { color: #8a5b00; background: #fff4d6; border-color: #ecd28b; }
+.data-status.is-stale { color: #9d3e31; background: #fcebe8; border-color: #efbcb4; }
 
 .dayahead-chart,
 .flow-map,
@@ -284,6 +305,30 @@ button:hover { filter: brightness(1.05); }
 .gas-flow-out { stroke: #2f7f45; }
 .gas-flow-value { fill: #273533; font-size: 13px; font-weight: 600; }
 .gas-flow-note { fill: var(--muted); font-size: 13px; }
+
+.gas-network-map { background: linear-gradient(180deg, #f8fbfa 0%, #f2f7f5 100%); border: 1px solid #dce9e4; border-radius: 14px; padding: 0; }
+.gas-map-kicker { fill: #536660; font-size: 13px; font-weight: 800; letter-spacing: 1.4px; }
+.gas-map-legend { fill: #5b6b66; font-size: 12px; font-weight: 650; }
+.gas-legend-import { fill: #157f76; }
+.gas-legend-export { fill: #c5523f; }
+.gas-flow-connector { stroke-linecap: round; opacity: 0.82; }
+.gas-flow-connector.is-import { stroke: #157f76; }
+.gas-flow-connector.is-export { stroke: #c5523f; }
+.gas-flow-number { font-size: 13px; font-weight: 800; paint-order: stroke; stroke: #f8fbfa; stroke-width: 5px; stroke-linejoin: round; }
+.gas-flow-number.is-import { fill: #0d6b64; }
+.gas-flow-number.is-export { fill: #a63e30; }
+.gas-map-node { stroke-width: 1.5; filter: drop-shadow(0 5px 10px rgba(27, 58, 47, 0.08)); }
+.gas-map-node-border { fill: #fff; stroke: #b8cbc5; }
+.gas-map-node-supply { fill: #fff7e8; stroke: #dfbd76; }
+.gas-map-node-storage { fill: #edf4ff; stroke: #96b9e8; }
+.gas-map-code { fill: #213c34; font-size: 16px; font-weight: 850; }
+.gas-map-name { fill: #64736e; font-size: 11px; font-weight: 650; }
+.gas-map-missing { fill: #9b6a61; font-size: 10px; font-style: italic; }
+.gas-map-hub-ring { fill: rgba(15, 122, 98, 0.08); stroke: rgba(15, 122, 98, 0.18); stroke-width: 1; }
+.gas-map-hub { fill: #163e35; stroke: #2a6d5e; stroke-width: 3; filter: drop-shadow(0 8px 18px rgba(18, 58, 49, 0.2)); }
+.gas-map-hub-title { fill: #fff; font-size: 24px; font-weight: 850; }
+.gas-map-hub-subtitle { fill: #cce7df; font-size: 13px; font-weight: 700; }
+.gas-map-footnote { fill: #687a74; font-size: 11px; }
 
 .card-series {
   margin-top: 0.32rem;

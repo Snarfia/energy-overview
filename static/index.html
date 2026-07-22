@@ -1,10 +1,10 @@
 <!doctype html>
-<html lang="en">
+<html lang="nl">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Energy Market Overview</title>
-    <link rel="stylesheet" href="./styles.css?v=20260220-01" />
+    <link rel="stylesheet" href="./styles.css?v=20260722-02" />
   </head>
   <body>
     <main class="page">
@@ -60,13 +60,17 @@
 
     <template id="cardTemplate">
       <article class="card">
-        <h2 class="card-title"></h2>
+        <div class="card-heading">
+          <h2 class="card-title"></h2>
+          <span class="data-status"></span>
+        </div>
         <p class="card-value"></p>
+        <p class="card-explainer"></p>
         <p class="card-meta"></p>
         <a class="card-source" target="_blank" rel="noreferrer">Open source</a>
       </article>
     </template>
 
-    <script src="./app.js?v=20260220-01"></script>
+    <script src="./app.js?v=20260722-02"></script>
   </body>
 </html>
