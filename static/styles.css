@@ -113,7 +113,7 @@ button:hover { filter: brightness(1.05); }
 }
 
 #page-electricity.page-panel.active {
-  grid-template-columns: 1fr;
+  grid-template-columns: minmax(0, 2.55fr) minmax(350px, 0.85fr);
   grid-template-rows: minmax(0, 1fr);
 }
 
@@ -122,9 +122,51 @@ button:hover { filter: brightness(1.05); }
   grid-row: 1;
 }
 
-#page-electricity .block-wholesale,
+#page-electricity .block-wholesale {
+  grid-column: 2;
+  grid-row: 1;
+}
+
 #page-electricity .block-retail {
   display: none;
+}
+
+#page-electricity .block-demand .cards {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-rows: minmax(0, 1.45fr) minmax(0, 0.85fr);
+  height: 100%;
+}
+
+#page-electricity .block-wholesale .cards {
+  flex: 1;
+  grid-template-columns: 1fr;
+  grid-template-rows: repeat(3, minmax(0, 1fr));
+  overflow-y: auto;
+  padding-right: 0.2rem;
+}
+
+#page-electricity .card[data-card-id="nlCrossBorderFlows"] {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+}
+
+#page-electricity .card[data-card-id="nlCrossBorderFlows"] .flow-map {
+  flex: 1;
+  min-height: 280px;
+  height: 100%;
+}
+
+#page-electricity .card[data-card-id="dayAheadPower24h"],
+#page-electricity .card[data-card-id="nlGenerationMixShare"] {
+  display: flex;
+  flex-direction: column;
+}
+
+#page-electricity .card[data-card-id="dayAheadPower24h"] .dayahead-chart,
+#page-electricity .card[data-card-id="nlGenerationMixShare"] .pie-wrap {
+  flex: 1;
+  min-height: 0;
 }
 
 #page-gas.page-panel.active {
@@ -383,6 +425,45 @@ button:hover { filter: brightness(1.05); }
 .gas-balance-breakdown-value.is-export { fill: #ffad9f; }
 .gas-map-attribution { fill: #687a74; font-size: 9px; }
 
+.electricity-country-map {
+  background: linear-gradient(145deg, #f8fcfb 0%, #e8f3f0 100%);
+}
+.electricity-status-label { fill: #b9d0ca; font-size: 11px; font-weight: 700; }
+.electricity-status-value { font-size: 20px; font-weight: 900; letter-spacing: -0.35px; }
+.electricity-status-value.is-import { fill: #7ee0cd; }
+.electricity-status-value.is-export { fill: #ffad9f; }
+.electricity-status-detail { fill: #9ebbb3; font-size: 10px; font-weight: 700; }
+
+#page-electricity .card[data-card-id="nlCrossBorderFlows"] .card-value {
+  color: #173f36;
+  font-size: 1.16rem;
+  letter-spacing: -0.02em;
+}
+
+#page-electricity .dayahead-chart {
+  height: 100%;
+}
+
+#page-electricity .pie-wrap {
+  grid-template-columns: minmax(145px, 0.8fr) minmax(150px, 1fr);
+  margin-top: 0.25rem;
+  gap: 0.35rem;
+}
+
+#page-electricity .pie-chart {
+  max-width: 190px;
+  align-self: center;
+}
+
+#page-electricity .pie-legend {
+  align-content: center;
+  gap: 0.12rem;
+}
+
+#page-electricity .pie-legend-item {
+  font-size: 0.7rem;
+}
+
 #page-gas .card[data-card-id="nlGasImport"] .card-value {
   color: #173f36;
   font-size: 1.16rem;
@@ -390,14 +471,17 @@ button:hover { filter: brightness(1.05); }
 }
 
 @media (min-width: 1500px) {
+  #page-electricity.page-panel.active,
   #page-gas.page-panel.active {
     grid-template-columns: minmax(0, 2.75fr) minmax(420px, 0.9fr);
   }
+  #page-electricity .block-wholesale .cards,
   #page-gas .block-wholesale .cards {
     grid-template-columns: 1fr;
     grid-template-rows: repeat(3, minmax(0, 1fr));
     height: 100%;
   }
+  #page-electricity .block-wholesale .card,
   #page-gas .block-wholesale .card {
     padding: 0.7rem;
   }
@@ -529,6 +613,22 @@ html.mode-widget .mix-embed {
   }
   .block-demand .cards {
     grid-template-columns: 1fr;
+  }
+  #page-electricity.page-panel.active {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto;
+  }
+  #page-electricity .block-demand,
+  #page-electricity .block-wholesale {
+    grid-column: auto;
+    grid-row: auto;
+  }
+  #page-electricity .block-demand .cards {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto;
+  }
+  #page-electricity .card[data-card-id="nlCrossBorderFlows"] {
+    grid-column: auto;
   }
   .cards { grid-template-columns: 1fr; }
 }

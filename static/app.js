@@ -1,5 +1,5 @@
 const urlParams = new URLSearchParams(window.location.search);
-const BUILD_TAG = "2026-07-22-06";
+const BUILD_TAG = "2026-07-22-07";
 const isLandscapeMode = urlParams.get("landscape") === "1";
 const isWidgetMode = urlParams.get("widget") === "1";
 const initialPageParamRaw = urlParams.get("page");
@@ -33,8 +33,8 @@ const pagePanels = {
   gas: document.getElementById("page-gas"),
 };
 
-const ELECTRICITY_DEMAND_IDS = new Set(["nlCrossBorderFlows", "dayAheadPower24h", "nlElectricityOverview", "tennetRegulation", "nlGridFrequency", "ets", "tennetSettlement", "gaslichtElectricity"]);
-const ELECTRICITY_WHOLESALE_IDS = new Set([]);
+const ELECTRICITY_DEMAND_IDS = new Set(["nlCrossBorderFlows", "dayAheadPower24h", "nlGenerationMixShare"]);
+const ELECTRICITY_WHOLESALE_IDS = new Set(["tennetSettlement", "ets", "gaslichtElectricity"]);
 const ELECTRICITY_RETAIL_IDS = new Set([]);
 
 const GAS_DEMAND_IDS = new Set(["nlGasImport"]);
@@ -43,12 +43,13 @@ const GAS_RETAIL_IDS = new Set([]);
 
 const CARD_EXPLANATIONS = {
   nlCrossBorderFlows: "Fysieke uitwisseling via Nederlandse stroomverbindingen. Positief is netto import; negatief is netto export.",
-  dayAheadPower24h: "Uurprijzen voor levering op de volgende dag. Dit is een groothandelsprijs, zonder belasting en netkosten.",
+  dayAheadPower24h: "Beschikbare day-aheadprijzen vanaf het huidige uur. Kwartierprijzen zijn per leveringsuur gemiddeld; exclusief belasting en netkosten.",
+  nlGenerationMixShare: "Aandeel van de actuele Nederlandse productie per bron. De percentages tellen op tot 100% van de getoonde productiecategorieën.",
   nlElectricityOverview: "Het actuele totale elektriciteitsverbruik dat door ENTSO-E voor Nederland wordt gemeten.",
   nlGridFrequency: "De netfrequentie hoort rond 50 Hz te blijven; kleine afwijkingen tonen de directe balans tussen productie en verbruik.",
   tennetRegulation: "Onbalanssignaal van TenneT. Het toont hoeveel regelvermogen op dit moment wordt ingezet.",
   ets: "Prijs van een Europees emissierecht voor één ton CO₂; dit is een termijnmarktprijs.",
-  tennetSettlement: "Indicatieve prijs voor het verrekenen van onbalans op het Nederlandse elektriciteitsnet.",
+  tennetSettlement: "TenneT-onbalansprijs per kwartier. De titel en toelichting geven aan of het een definitieve settlement of een actuele indicatie is.",
   gaslichtElectricity: "Consumentenreferentie inclusief belastingen; niet rechtstreeks vergelijkbaar met de EPEX-groothandelsprijs.",
   nlGasImport: "Alle getoonde aanvoer minus opslagvulling en binnenlands verbruik. De kleine restbalans hoort rond nul te liggen.",
   nlGasConsumptionBreakdown: "Geschat Nederlands dagverbruik uit distributie, industrie en gascentrales op dezelfde volledige gasdag.",
@@ -103,6 +104,9 @@ function extractHourLabel(rowHour) {
 }
 
 function orderDayAheadRowsForDisplay(rows) {
+  if ((rows || []).some((row) => row?.timestamp)) {
+    return [...rows].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+  }
   const byHour = new Map();
   for (const row of rows || []) {
     const h = extractHourLabel(row?.hour);
@@ -123,8 +127,11 @@ function createDayAheadChart(rows) {
   const m = { top: 14, right: 14, bottom: 36, left: 52 };
   const innerW = width - m.left - m.right;
   const innerH = height - m.top - m.bottom;
-  const yMin = -100;
-  const yMax = 300;
+  const rawMin = Math.min(0, ...valid.map((point) => point.value));
+  const rawMax = Math.max(0, ...valid.map((point) => point.value));
+  const span = Math.max(20, rawMax - rawMin);
+  const yMin = Math.floor((rawMin - span * 0.12) / 10) * 10;
+  const yMax = Math.ceil((rawMax + span * 0.12) / 10) * 10;
 
   const xOf = (idx) => m.left + (idx / Math.max(1, rows.length - 1)) * innerW;
   const yOf = (v) => m.top + ((yMax - v) / (yMax - yMin)) * innerH;
@@ -161,7 +168,7 @@ function createDayAheadChart(rows) {
     svg.appendChild(lbl);
   }
 
-  const xTicks = [0, 4, 8, 12, 16, 20, 23];
+  const xTicks = [...new Set(Array.from({ length: Math.min(7, rows.length) }, (_, i) => Math.round((i * (rows.length - 1)) / Math.max(1, Math.min(6, rows.length - 1)))) )];
   for (const idx of xTicks) {
     if (idx < 0 || idx >= rows.length) continue;
     const x = xOf(idx);
@@ -186,7 +193,13 @@ function createDayAheadChart(rows) {
     new Intl.DateTimeFormat("en-GB", { hour: "2-digit", hour12: false, timeZone: "Europe/Amsterdam" }).format(new Date())
   );
   const nowLabel = `${String(nowHour).padStart(2, "0")}:00`;
-  const nowIdx = rows.findIndex((r) => extractHourLabel(r.hour) === nowLabel);
+  const now = new Date();
+  const nowIdxByTimestamp = rows.findIndex((row) => {
+    if (!row?.timestamp) return false;
+    const timestamp = new Date(row.timestamp);
+    return timestamp <= now && now < new Date(timestamp.getTime() + 3_600_000);
+  });
+  const nowIdx = nowIdxByTimestamp >= 0 ? nowIdxByTimestamp : rows.findIndex((r) => extractHourLabel(r.hour) === nowLabel);
   if (nowIdx >= 0) {
     const xNow = xOf(nowIdx);
     const nowLine = document.createElementNS("http://www.w3.org/2000/svg", "line");
@@ -214,8 +227,141 @@ function createDayAheadChart(rows) {
   return svg;
 }
 
+function createElectricityCountryMap(rows, quality = {}) {
+  const width = 1080;
+  const height = 620;
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+  svg.setAttribute("class", "flow-map gas-network-map electricity-country-map");
+  svg.setAttribute("role", "img");
+  svg.setAttribute("aria-label", "Geografische kaart van fysieke Nederlandse elektriciteitsstromen en de actuele netstatus");
+
+  const rowByName = new Map((rows || []).map((row) => [String(row.hour || ""), row]));
+  const maxAbs = Math.max(1, ...(rows || []).map((row) => Math.abs(Number(row.value))).filter(Number.isFinite));
+  const mapFrame = { x: 20, y: 44, width: 768, height: 550, originTileX: 7, originTileY: 4, zoom: 4 };
+  const worldSize = 256 * (2 ** mapFrame.zoom);
+  const mercator = (lon, lat) => {
+    const safeLat = Math.max(-85, Math.min(85, lat));
+    const x = ((lon + 180) / 360) * worldSize;
+    const sinLat = Math.sin((safeLat * Math.PI) / 180);
+    const y = (0.5 - Math.log((1 + sinLat) / (1 - sinLat)) / (4 * Math.PI)) * worldSize;
+    return { x, y };
+  };
+  const project = (lon, lat) => {
+    const point = mercator(lon, lat);
+    return {
+      x: mapFrame.x + point.x - mapFrame.originTileX * 256,
+      y: mapFrame.y + point.y - mapFrame.originTileY * 256,
+    };
+  };
+  const NL = project(5.3, 52.2);
+  const countryAt = (key, code, name, lon, lat, labelDx, labelDy) => {
+    const point = project(lon, lat);
+    return { key, code, name, ...point, labelX: point.x + labelDx, labelY: point.y + labelDy };
+  };
+  const countries = [
+    countryAt("Verenigd Koninkrijk", "GB", "Verenigd Koninkrijk", -2.0, 54.0, -72, -12),
+    countryAt("Belgie", "BE", "België", 4.5, 50.8, -82, 56),
+    countryAt("Duitsland", "DE", "Duitsland", 10.0, 51.2, 80, 24),
+    countryAt("Denemarken", "DK", "Denemarken", 9.5, 56.0, 88, -6),
+    countryAt("Noorwegen", "NO", "Noorwegen", 7.5, 60.5, 70, -25),
+  ];
+  const add = (tag, attrs = {}, content = "") => {
+    const element = document.createElementNS("http://www.w3.org/2000/svg", tag);
+    for (const [key, value] of Object.entries(attrs)) element.setAttribute(key, String(value));
+    if (content) element.textContent = content;
+    svg.appendChild(element);
+    return element;
+  };
+
+  for (let tileY = mapFrame.originTileY; tileY <= mapFrame.originTileY + 2; tileY += 1) {
+    for (let tileX = mapFrame.originTileX; tileX <= mapFrame.originTileX + 2; tileX += 1) {
+      add("image", {
+        x: mapFrame.x + (tileX - mapFrame.originTileX) * 256,
+        y: mapFrame.y + (tileY - mapFrame.originTileY) * 256,
+        width: 256,
+        height: 256,
+        href: `https://tile.openstreetmap.org/${mapFrame.zoom}/${tileX}/${tileY}.png`,
+        class: "gas-map-background",
+      });
+    }
+  }
+  add("rect", { x: mapFrame.x, y: mapFrame.y, width: mapFrame.width, height: mapFrame.height, rx: 18, class: "gas-map-background-wash" });
+  add("text", { x: 26, y: 30, class: "gas-map-kicker" }, "FYSIEKE ELEKTRICITEITSSTROMEN · ACTUEEL");
+  add("circle", { cx: 565, cy: 25, r: 5, class: "gas-legend-import" });
+  add("text", { x: 577, y: 30, class: "gas-map-legend" }, "import naar NL");
+  add("circle", { cx: 684, cy: 25, r: 5, class: "gas-legend-export" });
+  add("text", { x: 696, y: 30, class: "gas-map-legend" }, "export uit NL");
+
+  for (const country of countries) {
+    const row = rowByName.get(country.key);
+    const value = Number(row?.value);
+    if (row?.value === null || row?.value === undefined || !Number.isFinite(value)) continue;
+    const isImport = value >= 0;
+    const start = isImport ? country : NL;
+    const end = isImport ? NL : country;
+    const widthPx = Math.max(2.5, Math.min(12, 2.5 + (Math.abs(value) / maxAbs) * 9.5));
+    add("path", {
+      d: `M ${start.x} ${start.y} L ${end.x} ${end.y}`,
+      class: `gas-flow-connector ${isImport ? "is-import" : "is-export"}`,
+      "stroke-width": widthPx,
+    });
+  }
+
+  for (const country of countries) {
+    const row = rowByName.get(country.key);
+    const value = Number(row?.value);
+    const finite = row?.value !== null && row?.value !== undefined && Number.isFinite(value);
+    const isExport = finite && value < 0;
+    const magnitudeText = finite && Math.abs(value) < 50 ? "<0.1 GW" : `${(Math.abs(value) / 1000).toFixed(1)} GW`;
+    const flowText = finite ? `${magnitudeText} · ${isExport ? "export" : "import"}` : "geen actuele meting";
+    add("rect", { x: country.labelX - 73, y: country.labelY - 31, width: 146, height: 70, rx: 14, class: "gas-country-chip" });
+    add("text", { x: country.labelX, y: country.labelY - 9, "text-anchor": "middle", class: "gas-country-code" }, country.code);
+    add("text", { x: country.labelX, y: country.labelY + 7, "text-anchor": "middle", class: "gas-country-name" }, country.name);
+    add("text", { x: country.labelX, y: country.labelY + 28, "text-anchor": "middle", class: `gas-country-flow${isExport ? " is-export" : ""}` }, flowText);
+  }
+
+  add("circle", { cx: NL.x, cy: NL.y, r: 31, class: "gas-map-hub-ring" });
+  add("circle", { cx: NL.x, cy: NL.y, r: 23, class: "gas-map-hub" });
+  add("text", { x: NL.x, y: NL.y + 5, "text-anchor": "middle", class: "gas-map-hub-title" }, "NL");
+  add("text", { x: NL.x, y: NL.y + 48, "text-anchor": "middle", class: "gas-map-nl-label" }, "Nederlands elektriciteitsnet");
+
+  const loadMw = Number(quality?.loadMw);
+  const borderNetMw = Number(quality?.borderNetMw);
+  const frequencyHz = Number(quality?.frequencyHz);
+  const regulationMw = Number(quality?.regulationMw);
+  const generationMw = Number(quality?.generationMw);
+  const borderIsImport = Number.isFinite(borderNetMw) && borderNetMw >= 0;
+  const regulationIsUp = Number.isFinite(regulationMw) && regulationMw >= 0;
+  const deviationMhz = Number.isFinite(frequencyHz) ? Math.round((frequencyHz - 50) * 1000) : null;
+  const frequencyOkay = Number.isFinite(deviationMhz) && Math.abs(deviationMhz) <= 100;
+  const signedMhz = deviationMhz === null ? "n/a" : `${deviationMhz > 0 ? "+" : ""}${deviationMhz} mHz`;
+
+  add("rect", { x: 825, y: 54, width: 230, height: 500, rx: 22, class: "gas-balance-panel" });
+  add("text", { x: 850, y: 87, class: "gas-balance-kicker" }, "NETSTATUS");
+  add("text", { x: 850, y: 116, class: "gas-balance-heading" }, "Nederland");
+
+  const metric = (label, primary, secondary, y, tone = "is-import") => {
+    add("text", { x: 850, y, class: "electricity-status-label" }, label);
+    add("text", { x: 1030, y: y + 25, "text-anchor": "end", class: `electricity-status-value ${tone}` }, primary);
+    add("text", { x: 1030, y: y + 43, "text-anchor": "end", class: "electricity-status-detail" }, secondary);
+  };
+  metric("Systeembelasting", Number.isFinite(loadMw) ? `${(loadMw / 1000).toFixed(1)} GW` : "n/a", "actueel verbruik", 151);
+  metric("Grenssaldo", Number.isFinite(borderNetMw) ? `${(Math.abs(borderNetMw) / 1000).toFixed(1)} GW` : "n/a", borderIsImport ? "netto import" : "netto export", 222, borderIsImport ? "is-import" : "is-export");
+  metric("Netfrequentie", Number.isFinite(frequencyHz) ? `${frequencyHz.toFixed(3)} Hz` : "n/a", signedMhz, 293, frequencyOkay ? "is-import" : "is-export");
+  metric("Regelvermogen", Number.isFinite(regulationMw) ? `${Math.abs(regulationMw).toFixed(0)} MW` : "n/a", regulationIsUp ? "opregelen" : "afregelen", 364, regulationIsUp ? "is-import" : "is-export");
+  metric("Nederlandse opwek", Number.isFinite(generationMw) ? `${(generationMw / 1000).toFixed(1)} GW` : "n/a", "NED-productietotaal", 435);
+
+  add("rect", { x: 850, y: 500, width: 180, height: 34, rx: 11, class: frequencyOkay ? "gas-balance-ok" : "gas-balance-warning" });
+  add("text", { x: 940, y: 522, "text-anchor": "middle", class: "gas-balance-status" }, frequencyOkay ? "frequentie normaal" : "frequentie controleren");
+  add("text", { x: 26, y: 611, class: "gas-map-footnote" }, "Lijndikte = omvang; kleur = richting. Grensstromen zijn fysieke ENTSO-E-metingen; meetmomenten kunnen per verbinding verschillen.");
+  add("text", { x: 790, y: 611, "text-anchor": "end", class: "gas-map-attribution" }, "Kaart © OpenStreetMap-bijdragers");
+  return svg;
+}
+
 function createCrossBorderFlowMap(rows, unitLabel = "MW", mode = "electricity", context = {}) {
   if (mode === "gas") return createGasCountryBalanceMap(rows, context);
+  if (mode === "electricity") return createElectricityCountryMap(rows, context);
 
   const width = 980;
   const height = 420;
@@ -791,11 +937,14 @@ function createGenerationPieChart(rows) {
   const colorsByLabel = {
     Gascentrales: "#808080",
     Kolencentrales: "#111111",
-    Afval: "#8B5A2B",
+    WKK: "#C66B28",
+    Overig: "#8B5A2B",
     Zon: "#FFD500",
     Wind: "#2D7FF9",
+    "Wind op zee": "#2D7FF9",
     Biomassa: "#B7E67A",
     Kernenergie: "#8E44AD",
+    "Overig / niet uitgesplitst": "#8B5A2B",
   };
   const fallback = ["#0f7a62", "#2e8b74", "#4ea287", "#72b89b", "#95cdb0", "#b5dfc6", "#d4efde"];
   const total = valid.reduce((s, x) => s + x.value, 0);
@@ -840,7 +989,7 @@ function createGenerationPieChart(rows) {
   title.setAttribute("y", String(cy + 4));
   title.setAttribute("text-anchor", "middle");
   title.setAttribute("class", "pie-center-label");
-  title.textContent = "Mix";
+  title.textContent = "Opwek";
   svg.appendChild(title);
 
   const legend = document.createElement("div");
@@ -951,7 +1100,7 @@ function createCard(item) {
   const measuredAt = item.updatedAt ? new Date(item.updatedAt) : null;
   const ageHours = measuredAt && !Number.isNaN(measuredAt.getTime()) ? (Date.now() - measuredAt.getTime()) / 3_600_000 : null;
   const isDailySource = ["nlGasImport", "nlGasConsumptionBreakdown", "nlGasProduction", "gaslichtGas", "gaslichtElectricity"].includes(item.id);
-  const staleLimitHours = isDailySource ? 72 : 3;
+  const staleLimitHours = isDailySource ? 72 : item.id === "tennetSettlement" ? 24 : item.id === "nlCrossBorderFlows" ? 12 : 3;
   const detailLower = String(item.detail || "").toLowerCase();
   if (item.dataStatus === "stale" || (Number.isFinite(ageHours) && ageHours > staleLimitHours)) {
     statusEl.textContent = "Verouderd";
@@ -973,7 +1122,8 @@ function createCard(item) {
     shownValue = `${Number(item.value).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${item.unit}`;
   }
   if (item.id === "nlCrossBorderFlows" && Number.isFinite(Number(item.value))) {
-    shownValue = `${(Number(item.value) / 1000).toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} GW`;
+    const borderGw = Number(item.value) / 1000;
+    shownValue = `${Math.abs(borderGw).toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} GW netto ${borderGw >= 0 ? "import" : "export"}`;
   }
   if ((item.id === "gaslichtGas" || item.id === "gaslichtElectricity") && Number.isFinite(Number(item.value))) {
     shownValue = `${formatNumberFixed2(item.value)} ${item.unit}`;
@@ -993,7 +1143,7 @@ function createCard(item) {
   }
 
   if (item.id === "nlCrossBorderFlows" && Array.isArray(item.rows) && item.rows.length > 0) {
-    const map = createCrossBorderFlowMap(item.rows, item.unit || "MW", "electricity");
+    const map = createCrossBorderFlowMap(item.rows, item.unit || "MW", "electricity", item.quality || {});
     if (map) cardEl.appendChild(map);
   }
 
@@ -1089,10 +1239,17 @@ function splitItems(items) {
     else if (GAS_RETAIL_IDS.has(item.id)) gas.retail.push(item);
   }
 
-  const electricityDemandOrder = ["nlCrossBorderFlows", "dayAheadPower24h", "nlElectricityOverview", "nlGridFrequency", "tennetRegulation", "ets", "tennetSettlement", "gaslichtElectricity"];
+  const electricityDemandOrder = ["nlCrossBorderFlows", "dayAheadPower24h", "nlGenerationMixShare"];
   electricity.demand.sort((a, b) => {
     const ia = electricityDemandOrder.indexOf(a.id);
     const ib = electricityDemandOrder.indexOf(b.id);
+    return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib);
+  });
+
+  const electricityWholesaleOrder = ["tennetSettlement", "ets", "gaslichtElectricity"];
+  electricity.wholesale.sort((a, b) => {
+    const ia = electricityWholesaleOrder.indexOf(a.id);
+    const ib = electricityWholesaleOrder.indexOf(b.id);
     return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib);
   });
 

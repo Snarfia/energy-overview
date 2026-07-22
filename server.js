@@ -78,7 +78,8 @@ async function fetchJson(url, extraHeaders = {}, timeoutMs = 15000) {
 
 async function fetchNedUtilizations(params) {
   const sourceUrl = 'https://api.ned.nl/v1/utilizations';
-  const url = `${sourceUrl}?${query(params)}`;
+  const tomorrow = new Date(Date.now() + 24 * 3600_000).toISOString().slice(0, 10);
+  const url = `${sourceUrl}?${query({ classification: 2, 'validfrom[strictly_before]': tomorrow, ...params })}`;
   const payload = await fetchJson(url, {
     'X-AUTH-TOKEN': NED_TOKEN,
     authorization: `Bearer ${NED_TOKEN}`,
@@ -273,47 +274,65 @@ async function getDayAheadPower24h() {
 
   const { xml, url } = await entsoeFetchXml(params);
   const periods = xmlBlocks(xml, 'Period');
-  const hourMap = new Map();
+  const hourBuckets = new Map();
   for (const p of periods) {
     const points = parsePeriodPoints(p);
     for (const pt of points) {
       const h = new Date(pt.dt);
       h.setUTCMinutes(0, 0, 0);
-      hourMap.set(h.toISOString(), pt.value);
+      const key = h.toISOString();
+      const bucket = hourBuckets.get(key) || [];
+      bucket.push(pt.value);
+      hourBuckets.set(key, bucket);
     }
   }
-  if (!hourMap.size) throw new Error('No day-ahead rows from ENTSO-E');
+  if (!hourBuckets.size) throw new Error('No day-ahead rows from ENTSO-E');
 
+  const hourly = [...hourBuckets.entries()]
+    .map(([timestamp, values]) => ({
+      dt: new Date(timestamp),
+      value: values.reduce((sum, value) => sum + value, 0) / values.length,
+      samples: values.length,
+    }))
+    .sort((a, b) => a.dt - b.dt);
   const nowHourUtc = new Date();
   nowHourUtc.setUTCMinutes(0, 0, 0);
-  const byHour = new Map();
-  for (const [iso, value] of hourMap.entries()) {
-    const d = new Date(iso);
-    const hh = String(d.getHours()).padStart(2, '0');
-    byHour.set(`${hh}:00`, value);
-  }
-  const rows = [];
-  for (let h = 5; h <= 23; h += 1) {
-    const key = `${String(h).padStart(2, '0')}:00`;
-    rows.push({ hour: key, value: byHour.get(key) ?? null, unit: 'EUR/MWh' });
-  }
-  for (let h = 0; h <= 4; h += 1) {
-    const key = `${String(h).padStart(2, '0')}:00`;
-    rows.push({ hour: key, value: byHour.get(key) ?? null, unit: 'EUR/MWh' });
-  }
-  const first = rows.find((r) => r.value !== null);
-  const nowLabel = `${String(new Date().getHours()).padStart(2, '0')}:00`;
-  const nowRow = rows.find((r) => r.hour === nowLabel && r.value !== null);
+  let selected = hourly.filter((point) => point.dt >= nowHourUtc).slice(0, 24);
+  if (selected.length < 2) selected = hourly.slice(-24);
+
+  const localDate = (date) => new Intl.DateTimeFormat('nl-NL', {
+    timeZone: 'Europe/Amsterdam', day: '2-digit', month: '2-digit', year: 'numeric',
+  }).format(date);
+  const localHour = (date) => new Intl.DateTimeFormat('nl-NL', {
+    timeZone: 'Europe/Amsterdam', hour: '2-digit', minute: '2-digit', hour12: false,
+  }).format(date);
+  const todayKey = localDate(new Date());
+  const tomorrowKey = localDate(new Date(Date.now() + 24 * 3600_000));
+  const rows = selected.map((point) => {
+    const dateKey = localDate(point.dt);
+    const prefix = dateKey === todayKey ? 'Vandaag' : dateKey === tomorrowKey ? 'Morgen' : dateKey.slice(0, 5);
+    return {
+      hour: `${prefix} ${localHour(point.dt)}`,
+      value: point.value,
+      unit: 'EUR/MWh',
+      timestamp: point.dt.toISOString(),
+      samples: point.samples,
+    };
+  });
+  const nowRow = rows.find((row) => row.timestamp === nowHourUtc.toISOString());
+  const first = rows[0];
 
   return {
     id: 'dayAheadPower24h',
-    label: 'EPEX SPOT Day-Ahead NL (24h vooruit)',
+    label: 'EPEX Day-Ahead NL',
     value: nowRow?.value ?? first?.value ?? null,
     unit: 'EUR/MWh',
     source: 'ENTSO-E Transparency API (EPEX SPOT NL)',
     sourceUrl: url,
     updatedAt: new Date().toISOString(),
-    detail: 'Komende 24 uur per uur',
+    detail: `${rows.length} beschikbare leveringsuren vanaf nu; kwartierprijzen gemiddeld per uur`,
+    dataStatus: 'verified',
+    statusMessage: `${rows.reduce((sum, row) => sum + row.samples, 0)} ENTSO-E-prijspunten gecontroleerd`,
     rows,
   };
 }
@@ -396,6 +415,7 @@ async function getEntsoeGenerationMixShare() {
 
   let byCode = new Map();
   let usedUrl = ENTSOE_BASE;
+  let measuredAt = null;
   for (const att of attempts) {
     try {
       const { xml, url } = await entsoeFetchXml({
@@ -406,6 +426,7 @@ async function getEntsoeGenerationMixShare() {
       });
       const series = xmlBlocks(xml, 'TimeSeries');
       const nextByCode = new Map();
+      let nextMeasuredAt = null;
       for (const s of series) {
         const code = (xmlTagValue(s, 'psrType') || '').toUpperCase();
         if (!code) continue;
@@ -415,11 +436,15 @@ async function getEntsoeGenerationMixShare() {
             if (!best || point.dt > best.dt) best = point;
           }
         }
-        if (best) nextByCode.set(code, best.value);
+        if (best) {
+          nextByCode.set(code, best.value);
+          if (!nextMeasuredAt || best.dt > nextMeasuredAt) nextMeasuredAt = best.dt;
+        }
       }
       if (nextByCode.size) {
         byCode = nextByCode;
         usedUrl = url;
+        measuredAt = nextMeasuredAt;
         break;
       }
     } catch {
@@ -435,6 +460,7 @@ async function getEntsoeGenerationMixShare() {
     Wind: ['B18', 'B19'],
     Biomassa: ['B01'],
     Kernenergie: ['B14'],
+    Overig: ['B06', 'B07', 'B08', 'B09', 'B10', 'B11', 'B12', 'B13', 'B15', 'B20'],
   };
 
   const rows = [];
@@ -450,15 +476,18 @@ async function getEntsoeGenerationMixShare() {
 
   return {
     id: 'nlGenerationMixShare',
-    label: 'Opwek Mix NL (actuele verhouding)',
+    label: 'Nederlandse productiemix',
     value: null,
     unit: '',
     valueText: 'Verhouding per bron',
     source: 'ENTSO-E Transparency API',
     sourceUrl: usedUrl,
-    updatedAt: new Date().toISOString(),
-    detail: 'Relatieve verdeling per opwekbron',
-    rows: rows.map((r) => ({ hour: r.label, value: (r.mw / total) * 100, unit: '%' })),
+    updatedAt: (measuredAt || new Date()).toISOString(),
+    detail: `Actuele relatieve verdeling; totaal van getoonde bronnen ${total.toFixed(0)} MW`,
+    dataStatus: 'verified',
+    statusMessage: `${rows.length} ENTSO-E-productiecategorieën gecontroleerd`,
+    quality: { totalGenerationMw: total },
+    rows: rows.map((r) => ({ hour: r.label, value: (r.mw / total) * 100, unit: '%', mw: r.mw })),
   };
 }
 
@@ -523,23 +552,21 @@ function extractMixSumsFromObject(payload) {
 
 async function getNedGenerationMixShare() {
   const now = new Date();
-  const after = new Date(now.getTime() - 2 * 24 * 3600_000).toISOString().slice(0, 10);
+  const after = now.toISOString().slice(0, 10);
   const types = [
-    [1, 'Wind'],
-    [17, 'Wind'],
+    [17, 'Wind op zee'],
     [2, 'Zon'],
     [18, 'Gascentrales'],
     [19, 'Kolencentrales'],
     [20, 'Kernenergie'],
     [21, 'Afval'],
     [25, 'Biomassa'],
+    [35, 'WKK'],
   ];
   const byLabel = new Map();
   let sourceUrl = 'https://api.ned.nl/v1/utilizations';
 
-  for (const [type, label] of types) {
-    let chosen = null;
-    let localUrl = sourceUrl;
+  const latestForType = async (type) => {
     for (const att of [{ type, activity: 1 }, { type }, { type, activity: 2 }]) {
       try {
         const res = await fetchNedUtilizations({
@@ -547,50 +574,62 @@ async function getNedGenerationMixShare() {
           granularity: 4,
           granularitytimezone: 0,
           'validfrom[after]': after,
-          itemsPerPage: 300,
+          itemsPerPage: 200,
           ...att,
         });
-        localUrl = res.url;
         const parsed = res.rows
-          .map((r) => ({ dt: parseIsoUtc(r.validfrom || r.timestamp || r.date), mw: nedValueToMw(r) }))
-          .filter((x) => x.dt && x.mw !== null)
+          .map((row) => ({ dt: parseIsoUtc(row.validfrom || row.timestamp || row.date), mw: nedValueToMw(row) }))
+          .filter((entry) => entry.dt && entry.mw !== null && entry.mw >= 0)
           .sort((a, b) => a.dt - b.dt);
-        if (parsed.length) {
-          chosen = parsed[parsed.length - 1].mw;
-          break;
-        }
+        if (parsed.length) return { ...parsed[parsed.length - 1], url: res.url };
       } catch {
-        // try next
+        // Try the next official activity selection.
       }
     }
-    if (chosen !== null) {
-      byLabel.set(label, (byLabel.get(label) || 0) + chosen);
-      sourceUrl = localUrl;
-    }
+    return null;
+  };
+
+  const totalMeasurement = await latestForType(27);
+  if (!totalMeasurement || !(totalMeasurement.mw > 0)) throw new Error('No current NED ElectricityMix total');
+  sourceUrl = totalMeasurement.url;
+  const targetDt = totalMeasurement.dt;
+
+  for (const [type, label] of types) {
+    const measurement = await latestForType(type);
+    if (!measurement) continue;
+    const ageMinutes = Math.abs(targetDt.getTime() - measurement.dt.getTime()) / 60_000;
+    if (ageMinutes > 120) continue;
+    byLabel.set(label, measurement.mw);
   }
 
-  const entries = Array.from(byLabel.entries()).filter(([, v]) => Number.isFinite(v) && v > 0);
-  const total = entries.reduce((s, [, v]) => s + v, 0);
-  if (!entries.length || total <= 0) throw new Error('No NED generation mix values');
+  const knownEntries = Array.from(byLabel.entries()).filter(([, value]) => Number.isFinite(value) && value > 0);
+  const knownTotal = knownEntries.reduce((sum, [, value]) => sum + value, 0);
+  const total = totalMeasurement.mw;
+  const residual = total - knownTotal;
+  if (!knownEntries.length || total <= 0) throw new Error('No NED generation mix values');
+  if (residual > 0) byLabel.set('Overig / niet uitgesplitst', residual);
 
-  const order = ['Gascentrales', 'Kolencentrales', 'Afval', 'Zon', 'Wind', 'Biomassa', 'Kernenergie'];
+  const order = ['Gascentrales', 'WKK', 'Kolencentrales', 'Afval', 'Zon', 'Wind op zee', 'Biomassa', 'Kernenergie', 'Overig / niet uitgesplitst'];
   const rows = order
     .map((label) => {
-      const val = entries.find(([k]) => k === label)?.[1];
-      return val ? { hour: label, value: (val / total) * 100, unit: '%' } : null;
+      const val = byLabel.get(label);
+      return val ? { hour: label, value: (val / total) * 100, unit: '%', mw: val } : null;
     })
     .filter(Boolean);
 
   return {
     id: 'nlGenerationMixShare',
-    label: 'Opwek Mix NL (actuele verhouding)',
+    label: 'Nederlandse productiemix',
     value: null,
     unit: '',
     valueText: 'Verhouding per bron',
-    source: 'NED API (fallback)',
+    source: 'NED API',
     sourceUrl,
-    updatedAt: new Date().toISOString(),
-    detail: 'Relatieve verdeling per opwekbron (fallback via NED)',
+    updatedAt: targetDt.toISOString(),
+    detail: `Verdeling tegen officieel NED-totaal ${total.toFixed(0)} MW; niet afzonderlijk gepubliceerde productie staat onder Overig`,
+    dataStatus: residual >= -total * 0.05 ? 'verified' : 'warning',
+    statusMessage: `${rows.length} categorieën sluiten aan op NED ElectricityMix totaal`,
+    quality: { totalGenerationMw: total, categorizedGenerationMw: knownTotal, residualGenerationMw: residual },
     rows,
   };
 }
@@ -607,7 +646,8 @@ async function getNedGenerationMixShareFromUtilizations() {
     [20, 'Kernenergie'],
     [21, 'Afval'],
     [25, 'Biomassa'],
-    [26, 'Afval'],
+    [26, 'Overig'],
+    [35, 'WKK'],
   ];
 
   const sums = new Map();
@@ -656,21 +696,24 @@ async function getNedGenerationMixShareFromUtilizations() {
 
   const total = Array.from(sums.values()).reduce((a, b) => a + b, 0);
   if (!(total > 0)) throw new Error('No NED utilizations generation mix values');
-  const order = ['Gascentrales', 'Kolencentrales', 'Afval', 'Zon', 'Wind', 'Biomassa', 'Kernenergie'];
+  const order = ['Gascentrales', 'WKK', 'Kolencentrales', 'Afval', 'Zon', 'Wind', 'Biomassa', 'Kernenergie', 'Overig'];
   const rows = order
-    .map((k) => (sums.get(k) ? { hour: k, value: (sums.get(k) / total) * 100, unit: '%' } : null))
+    .map((k) => (sums.get(k) ? { hour: k, value: (sums.get(k) / total) * 100, unit: '%', mw: sums.get(k) } : null))
     .filter(Boolean);
 
   return {
     id: 'nlGenerationMixShare',
-    label: 'Opwek Mix NL (actuele verhouding)',
+    label: 'Nederlandse productiemix',
     value: null,
     unit: '',
     valueText: 'Verhouding per bron',
     source: 'NED API (utilizations fallback)',
     sourceUrl,
     updatedAt: (latestDt || new Date()).toISOString(),
-    detail: 'Relatieve verdeling per opwekbron (NED utilizations fallback)',
+    detail: `Actuele relatieve verdeling; totaal van getoonde bronnen ${total.toFixed(0)} MW`,
+    dataStatus: 'verified',
+    statusMessage: `${rows.length} NED-productiecategorieën gecontroleerd`,
+    quality: { totalGenerationMw: total },
     rows,
   };
 }
@@ -746,7 +789,7 @@ async function getNedGenerationMixShareFromDataportaal() {
 
       return {
         id: 'nlGenerationMixShare',
-        label: 'Opwek Mix NL (actuele verhouding)',
+        label: 'Nederlandse productiemix',
         value: null,
         unit: '',
         valueText: 'Verhouding per bron',
@@ -765,15 +808,15 @@ async function getNedGenerationMixShareFromDataportaal() {
 
 async function getGenerationMixShare() {
   try {
-    return await getNedGenerationMixShareFromDataportaal();
-  } catch {
+    return await getEntsoeGenerationMixShare();
+  } catch (entsoeError) {
     try {
-      return await getNedGenerationMixShareFromUtilizations();
-    } catch {
+      return await getNedGenerationMixShare();
+    } catch (nedCurrentError) {
       try {
-        return await getEntsoeGenerationMixShare();
+        return await getNedGenerationMixShareFromDataportaal();
       } catch {
-        return await getNedGenerationMixShare();
+        return await getNedGenerationMixShareFromUtilizations();
       }
     }
   }
@@ -833,67 +876,86 @@ async function getEntsoeCrossBorderFlows() {
   ];
 
   async function latestFlow(inDomain, outDomain) {
-    const tries = ['A11', 'A09'];
-    for (const doc of tries) {
-      try {
-        const { xml } = await entsoeFetchXml({
-          securityToken: ENTSOE_TOKEN,
-          documentType: doc,
-          in_Domain: inDomain,
-          out_Domain: outDomain,
-          periodStart: fmt(start),
-          periodEnd: fmt(end),
-        });
-        let latest = null;
-        for (const period of xmlBlocks(xml, 'Period')) {
-          for (const p of parsePeriodPoints(period)) {
-            if (!latest || p.dt > latest.dt) latest = p;
-          }
+    try {
+      const { xml } = await entsoeFetchXml({
+        securityToken: ENTSOE_TOKEN,
+        documentType: 'A11',
+        in_Domain: inDomain,
+        out_Domain: outDomain,
+        periodStart: fmt(start),
+        periodEnd: fmt(end),
+      });
+      let latest = null;
+      for (const period of xmlBlocks(xml, 'Period')) {
+        for (const point of parsePeriodPoints(period)) {
+          if (!latest || point.dt > latest.dt) latest = point;
         }
-        if (latest) return latest.value;
-      } catch {
-        // try next
       }
+      return latest;
+    } catch {
+      return null;
     }
-    return null;
   }
 
   const rows = [];
   for (const [name, eics] of neighbors) {
     let net = null;
+    let measuredAt = null;
     for (const eic of eics) {
       const inToNl = await latestFlow(eic, nl);
       const outFromNl = await latestFlow(nl, eic);
       if (inToNl !== null || outFromNl !== null) {
-        net = (inToNl || 0) - (outFromNl || 0);
+        net = (inToNl?.value || 0) - (outFromNl?.value || 0);
+        const timestamps = [inToNl?.dt, outFromNl?.dt].filter(Boolean).sort((a, b) => a - b);
+        measuredAt = timestamps[0] || null;
         break;
       }
     }
-    rows.push({ hour: name, value: net, unit: 'MW' });
+    rows.push({ hour: name, value: net, unit: 'MW', updatedAt: measuredAt?.toISOString() || null });
   }
 
   const numeric = rows.filter((r) => r.value !== null);
   if (!numeric.length) throw new Error('No ENTSO-E cross-border rows');
+  const measurementTimes = numeric.map((row) => parseIsoUtc(row.updatedAt)).filter(Boolean).sort((a, b) => a - b);
+  const missing = rows.length - numeric.length;
+  const spreadHours = measurementTimes.length > 1
+    ? (measurementTimes[measurementTimes.length - 1] - measurementTimes[0]) / 3_600_000
+    : 0;
+  const timingWarning = spreadHours > 2;
   return {
     id: 'nlCrossBorderFlows',
-    label: 'Cross-Border Physical Flows NL (live, netto)',
+    label: 'Elektriciteitsstromen Nederland',
     value: numeric.reduce((s, r) => s + (r.value || 0), 0),
     unit: 'MW',
     source: 'ENTSO-E Transparency API',
     sourceUrl: ENTSOE_BASE,
-    updatedAt: new Date().toISOString(),
-    detail: 'Positief = netto import naar NL, negatief = netto export uit NL',
+    updatedAt: (measurementTimes[0] || new Date()).toISOString(),
+    detail: 'Fysieke grensstromen; positief = netto import naar NL, negatief = netto export uit NL',
+    dataStatus: missing || timingWarning ? 'warning' : 'verified',
+    statusMessage: missing
+      ? `${numeric.length} van ${rows.length} fysieke ENTSO-E-corridors beschikbaar`
+      : timingWarning
+        ? `${numeric.length} fysieke corridors; meetmomenten lopen ${spreadHours.toFixed(1)} uur uiteen`
+        : `${numeric.length} fysieke ENTSO-E-corridors op vrijwel hetzelfde meetmoment`,
     rows,
   };
 }
 
 async function getGridFrequency() {
   const sourceUrl = 'https://mainsfrequency.com';
-  const html = await fetchText(sourceUrl);
-  const text = html.replace(/\s+/g, ' ');
-  const m = text.match(/([4-5][0-9](?:[.,][0-9]{1,4})?)\s*hz/i);
-  const value = m ? toNumber(m[1]) : null;
-  if (value === null) throw new Error('No frequency value found');
+  const liveBase = 'https://dat.netzfrequenzmessung.de:9080';
+  const sourceXml = await fetchText(`${liveBase}/source.xml`);
+  const fileName = xmlTagValue(sourceXml, 'f');
+  const valueTag = xmlTagValue(sourceXml, 't');
+  if (!fileName || !valueTag) throw new Error('No live frequency source pointer');
+  const liveXml = await fetchText(`${liveBase}/${fileName}`);
+  const value = toNumber(xmlTagValue(liveXml, valueTag));
+  if (value === null || value < 49 || value > 51) throw new Error('No valid live frequency value found');
+  const stamp = xmlTagValue(liveXml, 'z');
+  const stampMatch = stamp.match(/(\d{2})\.(\d{2})\.(\d{4})\s+(\d{2}):(\d{2}):(\d{2})/);
+  const measuredAt = stampMatch
+    ? new Date(Date.UTC(Number(stampMatch[3]), Number(stampMatch[2]) - 1, Number(stampMatch[1]), Number(stampMatch[4]), Number(stampMatch[5]), Number(stampMatch[6])))
+    : new Date();
   return {
     id: 'nlGridFrequency',
     label: 'Netfrequentie NL (actueel)',
@@ -901,8 +963,10 @@ async function getGridFrequency() {
     unit: 'Hz',
     source: 'mainsfrequency.com',
     sourceUrl,
-    updatedAt: new Date().toISOString(),
-    detail: 'Doelwaarde rond 50 Hz',
+    updatedAt: measuredAt.toISOString(),
+    detail: `Europese synchrone netfrequentie; afwijking ${(value - 50 >= 0 ? '+' : '')}${((value - 50) * 1000).toFixed(0)} mHz`,
+    dataStatus: 'verified',
+    statusMessage: 'Rechtstreeks uit het live meetbestand; niet uit de statische 50 Hz-doelwaarde',
   };
 }
 
@@ -930,23 +994,26 @@ async function getTennetRegulation() {
     .map((k) => toNumber(p[k]) || 0)
     .reduce((s, v) => s + v, 0);
 
-  const net = outPower - inPower;
+  const net = inPower - outPower;
+  const direction = net > 0 ? 'netto opregelen' : net < 0 ? 'netto afregelen' : 'geen netto activatie';
   return {
     id: 'tennetRegulation',
-    label: 'TenneT Balance Delta (actueel, 12s)',
+    label: 'Regelvermogen TenneT (actueel)',
     value: net,
     unit: 'MW',
     source: 'TenneT API (Balance Delta High Res)',
     sourceUrl,
     updatedAt: p.timeInterval_end || p.timeInterval_start || new Date().toISOString(),
-    detail: `In ${inPower.toFixed(1)} MW | Out ${outPower.toFixed(1)} MW`,
+    detail: `Opregelen ${inPower.toFixed(1)} MW | afregelen ${outPower.toFixed(1)} MW | ${direction}`,
+    dataStatus: 'verified',
+    statusMessage: 'Positief = netto opregelen; negatief = netto afregelen',
   };
 }
 
 async function getTennetSettlement() {
   if (!TENNET_TOKEN) throw new Error('TENNET_API_KEY ontbreekt');
   const now = new Date();
-  const from = new Date(now.getTime() - 2 * 3600_000);
+  const from = new Date(now.getTime() - 24 * 3600_000);
   const fmt = (d) => {
     const dd = String(d.getDate()).padStart(2, '0');
     const mm = String(d.getMonth() + 1).padStart(2, '0');
@@ -990,13 +1057,15 @@ async function getTennetSettlement() {
     if (value2 === null) throw new Error('No settlement points');
     return {
       id: 'tennetSettlement',
-      label: 'TenneT Settlement Price (actueel)',
+      label: 'Indicatieve onbalansprijs',
       value: value2,
       unit: 'EUR/MWh',
-      source: 'TenneT API (fallback via Balance Delta)',
+      source: 'TenneT API (Balance Delta High Res)',
       sourceUrl: bdUrl,
       updatedAt: p2.timeInterval_end || p2.timeInterval_start || new Date().toISOString(),
-      detail: `Fallback | Mid ${mid ?? 'n/a'} | Up ${up ?? 'n/a'} | Down ${down ?? 'n/a'}`,
+      detail: `Actuele indicatie; definitieve settlement volgt later | midden ${mid ?? 'n/a'} | op ${up ?? 'n/a'} | af ${down ?? 'n/a'}`,
+      dataStatus: 'verified',
+      statusMessage: 'Indicatieve prijs uit Balance Delta; niet de definitieve settlementprijs',
     };
   }
   points.sort((a, b) => String(a.timeInterval_end || '').localeCompare(String(b.timeInterval_end || '')));
@@ -1008,13 +1077,15 @@ async function getTennetSettlement() {
 
   return {
     id: 'tennetSettlement',
-    label: 'TenneT Settlement Price (actueel)',
-    value,
+    label: 'Onbalansprijs tekort (laatste PTU)',
+    value: shortage ?? surplus,
     unit: 'EUR/MWh',
     source: 'TenneT API (Settlement Prices)',
     sourceUrl,
     updatedAt: p.timeInterval_end || p.timeInterval_start || new Date().toISOString(),
-    detail: `Shortage ${shortage ?? 'n/a'} | Surplus ${surplus ?? 'n/a'}`,
+    detail: `Tekort ${shortage ?? 'n/a'} | overschot ${surplus ?? 'n/a'} | conditie ${p.regulating_condition || 'onbekend'}`,
+    dataStatus: 'verified',
+    statusMessage: 'Definitieve TenneT-settlement; de kaart toont tekort en overschot afzonderlijk in de toelichting',
   };
 }
 
@@ -1584,14 +1655,15 @@ async function collectOverview() {
   });
 
   const tasks = [
-    [getDayAheadPower24h, { id: 'dayAheadPower24h', label: 'EPEX SPOT Day-Ahead NL (24h vooruit)', value: null, unit: 'EUR/MWh', source: 'ENTSO-E Transparency API (EPEX SPOT NL)', sourceUrl: ENTSOE_BASE, updatedAt: new Date().toISOString(), detail: 'Bron tijdelijk niet bereikbaar', rows: fallbackRows24 }],
+    [getDayAheadPower24h, { id: 'dayAheadPower24h', label: 'EPEX Day-Ahead NL', value: null, unit: 'EUR/MWh', source: 'ENTSO-E Transparency API (EPEX SPOT NL)', sourceUrl: ENTSOE_BASE, updatedAt: new Date().toISOString(), detail: 'Bron tijdelijk niet bereikbaar', rows: fallbackRows24 }],
     [getTTFGas, { id: 'ttfGas', label: 'TTF Gas', value: null, unit: 'EUR/MWh', source: 'TradingEconomics', sourceUrl: 'https://tradingeconomics.com/commodity/eu-natural-gas', updatedAt: new Date().toISOString(), detail: 'Bron tijdelijk niet bereikbaar' }],
     [getETSPrice, { id: 'ets', label: 'EU ETS (ICE EUA frontcontract)', value: null, unit: 'EUR/tCO2', source: 'Barchart', sourceUrl: 'https://www.barchart.com/futures/quotes/CK*0', updatedAt: new Date().toISOString(), detail: 'Bron tijdelijk niet bereikbaar' }],
     [getNlGasImport, { id: 'nlGasImport', label: 'Netto in- en uitstroom aardgas', value: null, unit: 'GWh/d', source: 'ENTSOG API', sourceUrl: ENTSOG_BASE, updatedAt: new Date().toISOString(), detail: 'Bron tijdelijk niet bereikbaar', rows: [{ hour: 'Belgie', value: null, unit: 'GWh/d' }, { hour: 'Duitsland', value: null, unit: 'GWh/d' }, { hour: 'Verenigd Koninkrijk', value: null, unit: 'GWh/d' }, { hour: 'Noorwegen', value: null, unit: 'GWh/d' }, { hour: 'LNG (Gate+EET)', value: null, unit: 'GWh/d' }, { hour: 'Gasopslag (4 sites)', value: null, unit: 'GWh/d' }, { hour: 'Nationale productie', value: null, unit: 'GWh/d' }] }],
     [getNlGasProduction, { id: 'nlGasProduction', label: 'Gaswinning NL (laatste dag)', value: null, unit: 'GWh/d', source: 'ENTSOG API', sourceUrl: ENTSOG_BASE, updatedAt: new Date().toISOString(), detail: 'Bron tijdelijk niet bereikbaar' }],
-    [getEntsoeCrossBorderFlows, { id: 'nlCrossBorderFlows', label: 'Cross-Border Physical Flows NL (live, netto)', value: null, unit: 'MW', source: 'ENTSO-E Transparency API', sourceUrl: ENTSOE_BASE, updatedAt: new Date().toISOString(), detail: 'Bron tijdelijk niet bereikbaar', rows: [{ hour: 'Belgie', value: null, unit: 'MW' }, { hour: 'Duitsland', value: null, unit: 'MW' }, { hour: 'Verenigd Koninkrijk', value: null, unit: 'MW' }, { hour: 'Denemarken', value: null, unit: 'MW' }, { hour: 'Noorwegen', value: null, unit: 'MW' }] }],
+    [getEntsoeCrossBorderFlows, { id: 'nlCrossBorderFlows', label: 'Elektriciteitsstromen Nederland', value: null, unit: 'MW', source: 'ENTSO-E Transparency API', sourceUrl: ENTSOE_BASE, updatedAt: new Date().toISOString(), detail: 'Bron tijdelijk niet bereikbaar', rows: [{ hour: 'Belgie', value: null, unit: 'MW' }, { hour: 'Duitsland', value: null, unit: 'MW' }, { hour: 'Verenigd Koninkrijk', value: null, unit: 'MW' }, { hour: 'Denemarken', value: null, unit: 'MW' }, { hour: 'Noorwegen', value: null, unit: 'MW' }] }],
     [getNlGasStorage, { id: 'nlGasStorage', label: 'NL Gasopslag (actueel)', value: null, unit: '%', source: 'NED API', sourceUrl: 'https://api.ned.nl/v1/utilizations', updatedAt: new Date().toISOString(), detail: 'Bron tijdelijk niet bereikbaar' }],
     [getEntsoeElectricityOverview, { id: 'nlElectricityOverview', label: 'Elektriciteit NL (actuele load)', value: null, unit: 'MW', source: 'ENTSO-E Transparency API', sourceUrl: ENTSOE_BASE, updatedAt: new Date().toISOString(), detail: 'Bron tijdelijk niet bereikbaar', rows: [] }],
+    [getGenerationMixShare, { id: 'nlGenerationMixShare', label: 'Opwekmix Nederland', value: null, unit: '', valueText: 'Verdeling per bron', source: 'ENTSO-E Transparency API', sourceUrl: ENTSOE_BASE, updatedAt: new Date().toISOString(), detail: 'Bron tijdelijk niet bereikbaar', rows: [] }],
     [getGridFrequency, { id: 'nlGridFrequency', label: 'Netfrequentie NL (actueel)', value: null, unit: 'Hz', source: 'mainsfrequency.com', sourceUrl: 'https://mainsfrequency.com', updatedAt: new Date().toISOString(), detail: 'Bron tijdelijk niet bereikbaar' }],
     [async () => {
       try {
@@ -1600,8 +1672,8 @@ async function collectOverview() {
         return await getNlGasConsumptionBreakdownFallbackEntsog();
       }
     }, { id: 'nlGasConsumptionBreakdown', label: 'Gasconsumptie NL (laatste volledige dag)', value: null, unit: 'GWh/d', source: 'NED API', sourceUrl: 'https://api.ned.nl/v1/utilizations', updatedAt: new Date().toISOString(), detail: 'Bron tijdelijk niet bereikbaar', rows: [] }],
-    [getTennetRegulation, { id: 'tennetRegulation', label: 'TenneT Balance Delta (actueel, 12s)', value: null, unit: 'MW', source: 'TenneT API (Balance Delta High Res)', sourceUrl: 'https://api.tennet.eu/publications/v1/balance-delta-high-res/latest', updatedAt: new Date().toISOString(), detail: 'Bron tijdelijk niet bereikbaar' }],
-    [getTennetSettlement, { id: 'tennetSettlement', label: 'TenneT Settlement Price (actueel)', value: null, unit: 'EUR/MWh', source: 'TenneT API (Settlement Prices)', sourceUrl: 'https://api.tennet.eu/publications/v1/settlement-prices', updatedAt: new Date().toISOString(), detail: 'Bron tijdelijk niet bereikbaar' }],
+    [getTennetRegulation, { id: 'tennetRegulation', label: 'Regelvermogen TenneT (actueel)', value: null, unit: 'MW', source: 'TenneT API (Balance Delta High Res)', sourceUrl: 'https://api.tennet.eu/publications/v1/balance-delta-high-res/latest', updatedAt: new Date().toISOString(), detail: 'Bron tijdelijk niet bereikbaar' }],
+    [getTennetSettlement, { id: 'tennetSettlement', label: 'Onbalansprijs TenneT', value: null, unit: 'EUR/MWh', source: 'TenneT API (Settlement Prices)', sourceUrl: 'https://api.tennet.eu/publications/v1/settlement-prices', updatedAt: new Date().toISOString(), detail: 'Bron tijdelijk niet bereikbaar' }],
     [getOverstappenElectricityReference, { id: 'gaslichtElectricity', label: 'Stroom referentieprijs (Overstappen.nl)', value: null, unit: 'EUR/kWh', source: 'Overstappen.nl', sourceUrl: OVERSTAPPEN_POWER_URL, updatedAt: new Date().toISOString(), detail: 'Bron tijdelijk niet bereikbaar' }],
     [getOverstappenGasReference, { id: 'gaslichtGas', label: 'Gas referentieprijs (Overstappen.nl)', value: null, unit: 'EUR/m3', source: 'Overstappen.nl', sourceUrl: OVERSTAPPEN_GAS_URL, updatedAt: new Date().toISOString(), detail: 'Bron tijdelijk niet bereikbaar' }],
   ];
@@ -1625,6 +1697,42 @@ async function collectOverview() {
     }
   }
   items.push(...staticFallbacks);
+
+  // Keep the electricity map internally consistent and attach the system
+  // measurements that belong in its compact net-status panel.
+  const electricityFlow = items.find((item) => item?.id === 'nlCrossBorderFlows');
+  const electricityLoad = items.find((item) => item?.id === 'nlElectricityOverview');
+  const gridFrequency = items.find((item) => item?.id === 'nlGridFrequency');
+  const regulation = items.find((item) => item?.id === 'tennetRegulation');
+  const generationMix = items.find((item) => item?.id === 'nlGenerationMixShare');
+  if (electricityFlow) {
+    const borderNetMw = toNumber(electricityFlow.value);
+    const loadMw = toNumber(electricityLoad?.value);
+    const frequencyHz = toNumber(gridFrequency?.value);
+    const regulationMw = toNumber(regulation?.value);
+    const generationMw = toNumber(generationMix?.quality?.totalGenerationMw);
+    const balanceDifferenceMw = generationMw !== null && borderNetMw !== null && loadMw !== null
+      ? generationMw + borderNetMw - loadMw
+      : null;
+    electricityFlow.quality = {
+      borderNetMw,
+      loadMw,
+      loadUpdatedAt: electricityLoad?.updatedAt || null,
+      frequencyHz,
+      frequencyUpdatedAt: gridFrequency?.updatedAt || null,
+      regulationMw,
+      regulationUpdatedAt: regulation?.updatedAt || null,
+      generationMw,
+      generationUpdatedAt: generationMix?.updatedAt || null,
+      balanceDifferenceMw,
+    };
+    const borderText = borderNetMw === null
+      ? 'grenssaldo onbekend'
+      : borderNetMw >= 0
+        ? `netto import ${(borderNetMw / 1000).toFixed(1)} GW`
+        : `netto export ${(Math.abs(borderNetMw) / 1000).toFixed(1)} GW`;
+    electricityFlow.detail = `${borderText}${loadMw === null ? '' : ` | actuele systeembelasting ${(loadMw / 1000).toFixed(1)} GW`}`;
+  }
 
   // Cross-check the gas balance using values that share the same GWh/day basis.
   // A small difference is expected from linepack, measurement timing and points
