@@ -1061,6 +1061,23 @@ function selectLatestCompleteGasDay(rows, minNumericRows = 1) {
   };
 }
 
+function selectGasDay(rows, preferredDay, minNumericRows = 1) {
+  if (!preferredDay) return selectLatestCompleteGasDay(rows, minNumericRows);
+  const dayRows = (rows || []).filter((row) => String(row?.periodFrom || '').slice(0, 10) === preferredDay);
+  const numericRows = dayRows.filter((row) => entsogGwhDay(row?.value, row?.unit) !== null).length;
+  if (numericRows < minNumericRows) return null;
+  const timestamps = dayRows
+    .map((row) => parseIsoUtc(row?.periodFrom))
+    .filter(Boolean)
+    .sort((a, b) => a - b);
+  return {
+    day: preferredDay,
+    rows: dayRows,
+    numericRows,
+    updatedAt: timestamps.at(-1)?.toISOString() || `${preferredDay}T00:00:00.000Z`,
+  };
+}
+
 async function getEntsogOperational(indicator, daysBack = 4, limit = 6000) {
   const to = new Date();
   const from = new Date(to.getTime() - daysBack * 24 * 3600_000);
@@ -1073,11 +1090,11 @@ async function getEntsogOperational(indicator, daysBack = 4, limit = 6000) {
   return { rows, sourceUrl };
 }
 
-async function getNlGasProduction() {
+async function getNlGasProduction(preferredDay = null) {
   const { rows, sourceUrl } = await getEntsogOperational('Allocation', 5, 5000);
   const prod = rows.filter((r) => String(r.directionKey || '').toLowerCase() === 'entry' && String(r.pointLabel || '').toLowerCase().includes('production'));
   if (!prod.length) throw new Error('No ENTSOG production rows');
-  const selected = selectLatestCompleteGasDay(prod, 1);
+  const selected = selectGasDay(prod, preferredDay, 1);
   if (!selected) throw new Error('No complete ENTSOG production day');
   const dayRows = selected.rows;
   const total = dayRows.reduce((s, r) => s + (entsogGwhDay(r.value, r.unit) || 0), 0);
@@ -1171,7 +1188,7 @@ async function getNlGasImport() {
   let productionValue = null;
   let productionUpdatedAt = null;
   try {
-    const prod = await getNlGasProduction();
+    const prod = await getNlGasProduction(selected.day);
     productionValue = toNumber(prod?.value);
     productionUpdatedAt = prod?.updatedAt || null;
   } catch {
@@ -1369,9 +1386,9 @@ async function getNlGasConsumptionBreakdown() {
   };
 }
 
-async function getNlGasConsumptionBreakdownFallbackEntsog() {
+async function getNlGasConsumptionBreakdownFallbackEntsog(preferredDay = null) {
   const { rows, sourceUrl } = await getEntsogOperational('Allocation', 6, 6000);
-  const selected = selectLatestCompleteGasDay(rows, 5);
+  const selected = selectGasDay(rows, preferredDay, 5);
   if (!selected) throw new Error('No complete ENTSOG allocation gas day');
   const dayRows = selected.rows.filter((r) => String(r.directionKey || '').toLowerCase() === 'exit');
   if (!dayRows.length) throw new Error('No ENTSOG exit rows for fallback consumption');
@@ -1615,7 +1632,22 @@ async function collectOverview() {
   const gasFlow = items.find((item) => item?.id === 'nlGasImport');
   const gasConsumption = items.find((item) => item?.id === 'nlGasConsumptionBreakdown');
   if (gasFlow && gasConsumption && Array.isArray(gasFlow.rows)) {
-    const supply = gasFlow.rows.reduce((sum, row) => {
+    const flowDay = String(gasFlow.updatedAt || '').slice(0, 10);
+    let consumptionDay = String(gasConsumption.updatedAt || '').slice(0, 10);
+    if (flowDay && consumptionDay && flowDay !== consumptionDay) {
+      try {
+        Object.assign(gasConsumption, await getNlGasConsumptionBreakdownFallbackEntsog(flowDay));
+        consumptionDay = String(gasConsumption.updatedAt || '').slice(0, 10);
+      } catch (err) {
+        errors.push({ source: 'gasBalanceAlignment', error: String(err.message || err) });
+      }
+    }
+    if (!flowDay || flowDay !== consumptionDay) {
+      gasFlow.dataStatus = 'warning';
+      gasFlow.statusMessage = `Gasbalans niet berekend: grensstromen (${flowDay || 'onbekend'}) en verbruik (${consumptionDay || 'onbekend'}) vallen niet op dezelfde gasdag.`;
+    } else {
+    const balanceRows = gasFlow.rows.filter((row) => row?.kind !== 'consumption');
+    const supply = balanceRows.reduce((sum, row) => {
       const value = toNumber(row?.value);
       return value === null ? sum : sum + value;
     }, 0);
@@ -1623,14 +1655,25 @@ async function collectOverview() {
     if (consumption !== null && consumption > 0) {
       const difference = supply - consumption;
       const differencePct = (difference / consumption) * 100;
+      const borderNet = balanceRows
+        .filter((row) => row?.kind === 'border')
+        .reduce((sum, row) => sum + (toNumber(row?.value) || 0), 0);
       const balanceMessage = `aanvoer ${supply.toFixed(1)} vs. verbruik ${consumption.toFixed(1)} GWh/d; verschil ${differencePct.toFixed(1)}%`;
-      gasFlow.quality = { supplyGwhDay: supply, consumptionGwhDay: consumption, differenceGwhDay: difference, differencePct };
+      gasFlow.rows = [
+        ...balanceRows,
+        { hour: 'Binnenlands verbruik', value: -consumption, unit: 'GWh/d', kind: 'consumption', updatedAt: gasConsumption.updatedAt },
+      ];
+      gasFlow.label = 'Gasbalans Nederland';
+      gasFlow.value = difference;
+      gasFlow.detail = `Gasdag ${String(gasFlow.updatedAt || '').slice(0, 10)} | grenssaldo ${borderNet.toFixed(1)} | netto aanvoer ${supply.toFixed(1)} | verbruik ${consumption.toFixed(1)} GWh/d`;
+      gasFlow.quality = { borderNetGwhDay: borderNet, supplyGwhDay: supply, consumptionGwhDay: consumption, differenceGwhDay: difference, differencePct };
       gasFlow.statusMessage = `${gasFlow.statusMessage || 'Bron gecontroleerd'}; ${balanceMessage}`;
       gasConsumption.statusMessage = `${gasConsumption.statusMessage || 'Bron gecontroleerd'}; ${balanceMessage}`;
       if (Math.abs(differencePct) > 15) {
         gasFlow.dataStatus = 'warning';
         gasConsumption.dataStatus = 'warning';
       }
+    }
     }
   }
 

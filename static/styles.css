@@ -128,11 +128,12 @@ button:hover { filter: brightness(1.05); }
 }
 
 #page-gas.page-panel.active {
-  grid-template-columns: minmax(0, 1.75fr) minmax(420px, 1.25fr);
+  grid-template-columns: minmax(0, 2.2fr) minmax(400px, 1fr);
 }
 
 #page-gas .block-wholesale .cards,
 #page-gas .block-retail .cards {
+  flex: 1;
   overflow-y: auto;
   padding-right: 0.2rem;
 }
@@ -311,7 +312,7 @@ button:hover { filter: brightness(1.05); }
 .gas-map-legend { fill: #5b6b66; font-size: 12px; font-weight: 650; }
 .gas-legend-import { fill: #157f76; }
 .gas-legend-export { fill: #c5523f; }
-.gas-flow-connector { stroke-linecap: round; opacity: 0.82; }
+.gas-flow-connector { fill: none; stroke-linecap: round; opacity: 0.78; }
 .gas-flow-connector.is-import { stroke: #157f76; }
 .gas-flow-connector.is-export { stroke: #c5523f; }
 .gas-flow-number { font-size: 13px; font-weight: 800; paint-order: stroke; stroke: #f8fbfa; stroke-width: 5px; stroke-linejoin: round; }
@@ -329,6 +330,63 @@ button:hover { filter: brightness(1.05); }
 .gas-map-hub-title { fill: #fff; font-size: 24px; font-weight: 850; }
 .gas-map-hub-subtitle { fill: #cce7df; font-size: 13px; font-weight: 700; }
 .gas-map-footnote { fill: #687a74; font-size: 11px; }
+
+.gas-country-map {
+  background:
+    radial-gradient(circle at 48% 42%, rgba(15, 122, 98, 0.08), transparent 24%),
+    linear-gradient(145deg, #f9fcfb 0%, #eef5f2 100%);
+}
+.gas-country-shape { fill: #fdfefd; stroke: #b8cbc5; stroke-width: 1.5; filter: drop-shadow(0 5px 10px rgba(28, 58, 48, 0.06)); }
+.gas-country-shape.is-nl { fill: #cae9df; stroke: #0f7a62; stroke-width: 2; }
+.gas-country-code { fill: #233b34; font-size: 15px; font-weight: 850; paint-order: stroke; stroke: rgba(255, 255, 255, 0.92); stroke-width: 4px; }
+.gas-country-name { fill: #50625c; font-size: 10px; font-weight: 700; paint-order: stroke; stroke: rgba(255, 255, 255, 0.94); stroke-width: 3px; }
+.gas-country-code.is-nl,
+.gas-country-name.is-nl { fill: #0c5e4d; }
+.gas-country-flow,
+.gas-node-flow { fill: #08736b; font-size: 11px; font-weight: 850; paint-order: stroke; stroke: #f7fbf9; stroke-width: 4px; stroke-linejoin: round; }
+.gas-country-flow.is-export,
+.gas-node-flow.is-export { fill: #b64938; }
+.gas-map-node-consumption { fill: #fff0ed; stroke: #dc8c7d; }
+.gas-balance-panel { fill: #183f36; stroke: #2d6658; stroke-width: 1.5; filter: drop-shadow(0 12px 24px rgba(20, 55, 47, 0.16)); }
+.gas-balance-kicker { fill: #93c9ba; font-size: 11px; font-weight: 850; letter-spacing: 1.5px; }
+.gas-balance-heading { fill: #fff; font-size: 22px; font-weight: 850; }
+.gas-balance-label { fill: #c8ddd7; font-size: 12px; font-weight: 650; }
+.gas-balance-label.strong { fill: #fff; font-size: 13px; font-weight: 800; }
+.gas-balance-value { font-size: 17px; font-weight: 850; }
+.gas-balance-value.is-import { fill: #7ee0cd; }
+.gas-balance-value.is-export { fill: #ffad9f; }
+.gas-balance-rule { stroke: rgba(255, 255, 255, 0.2); stroke-width: 1; }
+.gas-balance-total { fill: #fff; font-size: 31px; font-weight: 900; }
+.gas-balance-unit { fill: #b8d0c9; font-size: 12px; font-weight: 700; }
+.gas-balance-ok { fill: #dff5ed; }
+.gas-balance-warning { fill: #fff0d3; }
+.gas-balance-status { fill: #0a6854; font-size: 13px; font-weight: 900; }
+.gas-balance-percent { fill: #356e61; font-size: 10px; font-weight: 750; }
+.gas-balance-note { fill: #a9c3bb; font-size: 10px; }
+.gas-balance-breakdown-title { fill: #8fbeb2; font-size: 9px; font-weight: 850; letter-spacing: 1px; }
+.gas-balance-breakdown-label { fill: #bdd2cc; font-size: 10px; font-weight: 650; }
+.gas-balance-breakdown-value { fill: #7ee0cd; font-size: 11px; font-weight: 850; }
+.gas-balance-breakdown-value.is-export { fill: #ffad9f; }
+
+#page-gas .card[data-card-id="nlGasImport"] .card-value {
+  color: #173f36;
+  font-size: 1.45rem;
+  letter-spacing: -0.02em;
+}
+
+@media (min-width: 1500px) {
+  #page-gas.page-panel.active {
+    grid-template-columns: minmax(0, 2.35fr) minmax(600px, 1.3fr);
+  }
+  #page-gas .block-wholesale .cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: repeat(3, minmax(0, 1fr));
+    height: 100%;
+  }
+  #page-gas .block-wholesale .card {
+    padding: 0.7rem;
+  }
+}
 
 .card-series {
   margin-top: 0.32rem;
