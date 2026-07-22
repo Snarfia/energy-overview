@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-07-22T07:34:14.372Z",
-  "durationMs": 7541,
+  "generatedAt": "2026-07-22T07:50:32.501Z",
+  "durationMs": 21614,
   "items": [
     {
       "id": "dayAheadPower24h",
@@ -9,7 +9,7 @@
       "unit": "EUR/MWh",
       "source": "ENTSO-E Transparency API (EPEX SPOT NL)",
       "sourceUrl": "https://web-api.tp.entsoe.eu/api",
-      "updatedAt": "2026-07-22T07:34:07.200Z",
+      "updatedAt": "2026-07-22T07:50:13.970Z",
       "detail": "Komende 24 uur per uur",
       "rows": [
         {
@@ -137,21 +137,21 @@
     {
       "id": "ttfGas",
       "label": "TTF Gas",
-      "value": 60.7264,
+      "value": 61.0343,
       "unit": "EUR/MWh",
       "source": "TradingEconomics",
       "sourceUrl": "https://tradingeconomics.com/commodity/eu-natural-gas",
-      "updatedAt": "2026-07-22T07:34:07.235Z"
+      "updatedAt": "2026-07-22T07:50:14.014Z"
     },
     {
       "id": "ets",
       "label": "EU ETS (ICE EUA frontcontract)",
-      "value": 83.72,
+      "value": 83.61,
       "unit": "EUR/tCO2",
       "source": "Barchart",
       "sourceUrl": "https://www.barchart.com/futures/quotes/CK*0",
-      "updatedAt": "2026-07-22T07:34:07.733Z",
-      "detail": "Doorlopend EUA-frontcontract CKZ26 | laatste handel 02:23 CT"
+      "updatedAt": "2026-07-22T07:50:14.922Z",
+      "detail": "Doorlopend EUA-frontcontract CKZ26 | laatste handel 02:39 CT"
     },
     {
       "id": "nlGasImport",
@@ -221,7 +221,8 @@
         "supplyGwhDay": 313.7319120000001,
         "consumptionGwhDay": 328.35430499999995,
         "differenceGwhDay": -14.622392999999875,
-        "differencePct": -4.453236268670172
+        "differencePct": -4.453236268670172,
+        "storageFillPct": 33.4
       }
     },
     {
@@ -251,11 +252,11 @@
     {
       "id": "nlCrossBorderFlows",
       "label": "Cross-Border Physical Flows NL (live, netto)",
-      "value": -659.9990000000001,
+      "value": -670.1070930000003,
       "unit": "MW",
       "source": "ENTSO-E Transparency API",
       "sourceUrl": "https://web-api.tp.entsoe.eu/api",
-      "updatedAt": "2026-07-22T07:34:11.446Z",
+      "updatedAt": "2026-07-22T07:50:29.383Z",
       "detail": "Positief = netto import naar NL, negatief = netto export uit NL",
       "rows": [
         {
@@ -265,7 +266,7 @@
         },
         {
           "hour": "Duitsland",
-          "value": -4310.84,
+          "value": -4291.3167,
           "unit": "MW"
         },
         {
@@ -275,12 +276,12 @@
         },
         {
           "hour": "Denemarken",
-          "value": -670.93,
+          "value": -700.16,
           "unit": "MW"
         },
         {
           "hour": "Noorwegen",
-          "value": 0,
+          "value": -0.401393,
           "unit": "MW"
         }
       ]
@@ -292,7 +293,7 @@
       "unit": "%",
       "source": "NED Website",
       "sourceUrl": "https://ned.nl/nl/gasopslagen-nederland",
-      "updatedAt": "2026-07-22T07:34:11.556Z",
+      "updatedAt": "2026-07-22T07:50:29.507Z",
       "detail": "Actuele nationale vullingsgraad van NED",
       "rows": [
         {
@@ -305,11 +306,11 @@
     {
       "id": "nlElectricityOverview",
       "label": "Elektriciteit NL (actuele load)",
-      "value": 10235.716,
+      "value": 9983.286,
       "unit": "MW",
       "source": "ENTSO-E Transparency API",
       "sourceUrl": "https://web-api.tp.entsoe.eu/api",
-      "updatedAt": "2026-07-22T06:45:00.000Z",
+      "updatedAt": "2026-07-22T07:00:00.000Z",
       "detail": "Actuele load uit ENTSO-E",
       "rows": []
     },
@@ -320,7 +321,7 @@
       "unit": "Hz",
       "source": "mainsfrequency.com",
       "sourceUrl": "https://mainsfrequency.com/",
-      "updatedAt": "2026-07-22T07:34:11.754Z",
+      "updatedAt": "2026-07-22T07:50:29.647Z",
       "detail": "Doelwaarde rond 50 Hz"
     },
     {
@@ -339,12 +340,12 @@
     {
       "id": "tennetRegulation",
       "label": "TenneT Balance Delta (actueel, 12s)",
-      "value": 179.1,
+      "value": 334,
       "unit": "MW",
       "source": "TenneT API (Balance Delta High Res)",
       "sourceUrl": "https://api.tennet.eu/publications/v1/balance-delta-high-res/latest",
-      "updatedAt": "2026-07-22T07:32:00Z",
-      "detail": "In 0.0 MW | Out 179.1 MW"
+      "updatedAt": "2026-07-22T07:48:24Z",
+      "detail": "In 0.0 MW | Out 334.0 MW"
     },
     {
       "id": "tennetSettlement",
@@ -353,8 +354,8 @@
       "unit": "EUR/MWh",
       "source": "TenneT API (fallback via Balance Delta)",
       "sourceUrl": "https://api.tennet.eu/publications/v1/balance-delta-high-res/latest",
-      "updatedAt": "2026-07-22T07:32:00Z",
-      "detail": "Fallback | Mid 109.95 | Up n/a | Down 18.3"
+      "updatedAt": "2026-07-22T07:48:24Z",
+      "detail": "Fallback | Mid 109.95 | Up n/a | Down -10"
     },
     {
       "id": "gaslichtElectricity",

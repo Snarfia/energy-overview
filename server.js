@@ -1113,7 +1113,7 @@ async function getNlGasProduction(preferredDay = null) {
   };
 }
 
-async function getNlGasImport() {
+async function getNlGasImport(preferredDay = null) {
   const [{ rows: opRows }, { rows: flowRows, sourceUrl }] = await Promise.all([
     fetchJson(`${ENTSOG_BASE}/operatorpointdirections?${query({ operatorKey: ENTSOG_NL_OPERATOR, limit: 1200 })}`).then((p) => ({ rows: p.operatorpointdirections || [] })),
     getEntsogOperational('Physical Flow', 4, 6000),
@@ -1124,7 +1124,7 @@ async function getNlGasImport() {
 
   // ENTSOG publishes several start times for the same gas day. Selecting one
   // exact timestamp used to leave just one empty row and silently revive old data.
-  const selected = selectLatestCompleteGasDay(flowRows, 10);
+  const selected = selectGasDay(flowRows, preferredDay, 10);
   if (!selected) throw new Error('No complete ENTSOG physical-flow gas day');
   const rowsAtDay = selected.rows;
 
@@ -1632,23 +1632,32 @@ async function collectOverview() {
   const gasFlow = items.find((item) => item?.id === 'nlGasImport');
   const gasConsumption = items.find((item) => item?.id === 'nlGasConsumptionBreakdown');
   const gasProduction = items.find((item) => item?.id === 'nlGasProduction');
+  const gasStorage = items.find((item) => item?.id === 'nlGasStorage');
   if (gasFlow && gasConsumption && Array.isArray(gasFlow.rows)) {
-    const flowDay = String(gasFlow.updatedAt || '').slice(0, 10);
+    let flowDay = String(gasFlow.updatedAt || '').slice(0, 10);
+    let consumptionDay = String(gasConsumption.updatedAt || '').slice(0, 10);
+    if (flowDay && consumptionDay && flowDay !== consumptionDay) {
+      try {
+        Object.assign(gasConsumption, await getNlGasConsumptionBreakdownFallbackEntsog(flowDay));
+        consumptionDay = String(gasConsumption.updatedAt || '').slice(0, 10);
+      } catch (consumptionErr) {
+        try {
+          Object.assign(gasFlow, await getNlGasImport(consumptionDay));
+          flowDay = String(gasFlow.updatedAt || '').slice(0, 10);
+        } catch (flowErr) {
+          errors.push({
+            source: 'gasBalanceAlignment',
+            error: `${String(consumptionErr.message || consumptionErr)}; ${String(flowErr.message || flowErr)}`,
+          });
+        }
+      }
+    }
     const productionDay = String(gasProduction?.updatedAt || '').slice(0, 10);
     if (gasProduction && flowDay && productionDay && flowDay !== productionDay) {
       try {
         Object.assign(gasProduction, await getNlGasProduction(flowDay));
       } catch (err) {
         errors.push({ source: 'gasProductionAlignment', error: String(err.message || err) });
-      }
-    }
-    let consumptionDay = String(gasConsumption.updatedAt || '').slice(0, 10);
-    if (flowDay && consumptionDay && flowDay !== consumptionDay) {
-      try {
-        Object.assign(gasConsumption, await getNlGasConsumptionBreakdownFallbackEntsog(flowDay));
-        consumptionDay = String(gasConsumption.updatedAt || '').slice(0, 10);
-      } catch (err) {
-        errors.push({ source: 'gasBalanceAlignment', error: String(err.message || err) });
       }
     }
     if (!flowDay || flowDay !== consumptionDay) {
@@ -1675,7 +1684,14 @@ async function collectOverview() {
       gasFlow.label = 'Gasbalans Nederland';
       gasFlow.value = difference;
       gasFlow.detail = `Gasdag ${String(gasFlow.updatedAt || '').slice(0, 10)} | grenssaldo ${borderNet.toFixed(1)} | netto aanvoer ${supply.toFixed(1)} | verbruik ${consumption.toFixed(1)} GWh/d`;
-      gasFlow.quality = { borderNetGwhDay: borderNet, supplyGwhDay: supply, consumptionGwhDay: consumption, differenceGwhDay: difference, differencePct };
+      gasFlow.quality = {
+        borderNetGwhDay: borderNet,
+        supplyGwhDay: supply,
+        consumptionGwhDay: consumption,
+        differenceGwhDay: difference,
+        differencePct,
+        storageFillPct: toNumber(gasStorage?.value),
+      };
       gasFlow.statusMessage = `${gasFlow.statusMessage || 'Bron gecontroleerd'}; ${balanceMessage}`;
       gasConsumption.statusMessage = `${gasConsumption.statusMessage || 'Bron gecontroleerd'}; ${balanceMessage}`;
       if (Math.abs(differencePct) > 15) {

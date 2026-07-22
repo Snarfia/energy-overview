@@ -1,5 +1,5 @@
 const urlParams = new URLSearchParams(window.location.search);
-const BUILD_TAG = "2026-07-22-04";
+const BUILD_TAG = "2026-07-22-05";
 const isLandscapeMode = urlParams.get("landscape") === "1";
 const isWidgetMode = urlParams.get("widget") === "1";
 const initialPageParamRaw = urlParams.get("page");
@@ -38,7 +38,7 @@ const ELECTRICITY_WHOLESALE_IDS = new Set([]);
 const ELECTRICITY_RETAIL_IDS = new Set([]);
 
 const GAS_DEMAND_IDS = new Set(["nlGasImport"]);
-const GAS_WHOLESALE_IDS = new Set(["nlGasConsumptionBreakdown", "nlGasStorage", "nlGasProduction", "ttfGas", "ets", "gaslichtGas"]);
+const GAS_WHOLESALE_IDS = new Set(["ttfGas", "ets", "gaslichtGas"]);
 const GAS_RETAIL_IDS = new Set([]);
 
 const CARD_EXPLANATIONS = {
@@ -500,21 +500,40 @@ function createGasCountryBalanceMap(rows, quality = {}) {
     .map((row) => Math.abs(Number(row.value)))
     .filter(Number.isFinite);
   const maxAbs = Math.max(1, ...magnitudes);
-  const NL = { x: 505, y: 220 };
+  const mapFrame = { x: 20, y: 44, width: 768, height: 630, originTileX: 7, originTileY: 4, zoom: 4 };
+  const worldSize = 256 * (2 ** mapFrame.zoom);
+  const mercator = (lon, lat) => {
+    const safeLat = Math.max(-85, Math.min(85, lat));
+    const x = ((lon + 180) / 360) * worldSize;
+    const sinLat = Math.sin((safeLat * Math.PI) / 180);
+    const y = (0.5 - Math.log((1 + sinLat) / (1 - sinLat)) / (4 * Math.PI)) * worldSize;
+    return { x, y };
+  };
+  const project = (lon, lat) => {
+    const point = mercator(lon, lat);
+    return {
+      x: mapFrame.x + point.x - mapFrame.originTileX * 256,
+      y: mapFrame.y + point.y - mapFrame.originTileY * 256,
+    };
+  };
+  const NL = project(5.3, 52.2);
+  const countryAt = (key, code, name, lon, lat, labelDx, labelDy) => {
+    const point = project(lon, lat);
+    return { key, code, name, ...point, labelX: point.x + labelDx, labelY: point.y + labelDy };
+  };
 
   const countries = [
-    { key: "Verenigd Koninkrijk", code: "GB", name: "Verenigd Koninkrijk", d: "M208 170 L226 155 L252 148 L276 156 L292 176 L301 201 L298 230 L286 254 L262 272 L235 278 L214 266 L202 244 L196 218 L198 192 Z", x: 248, y: 220 },
-    { key: "Belgie", code: "BE", name: "België", d: "M386 248 L402 238 L424 238 L444 248 L454 266 L448 286 L430 298 L404 298 L390 284 L384 266 Z", x: 420, y: 270 },
-    { key: "Nederland", code: "NL", name: "Nederland", d: "M470 186 L488 176 L510 176 L529 184 L540 201 L542 224 L536 246 L520 262 L500 268 L482 262 L472 244 L468 220 L468 198 Z", x: 505, y: 220, isNl: true },
-    { key: "Duitsland", code: "DE", name: "Duitsland", d: "M576 162 L612 150 L656 149 L704 158 L736 178 L748 206 L748 236 L734 264 L706 286 L668 298 L628 299 L596 286 L578 262 L570 230 L568 198 Z", x: 662, y: 224 },
-    { key: "Noorwegen", code: "NO", name: "Noorwegen", d: "M496 40 L518 30 L542 30 L560 42 L568 58 L566 78 L554 96 L536 108 L514 112 L496 106 L486 90 L484 70 L490 52 Z", x: 528, y: 72 },
+    countryAt("Verenigd Koninkrijk", "GB", "Verenigd Koninkrijk", -2.0, 54.0, -70, -10),
+    countryAt("Belgie", "BE", "België", 4.5, 50.8, -80, 52),
+    countryAt("Duitsland", "DE", "Duitsland", 10.0, 51.2, 75, 20),
+    countryAt("Noorwegen", "NO", "Noorwegen", 7.5, 60.5, 65, -28),
   ];
 
   const internalNodes = [
-    { key: "LNG-terminals", label: "LNG", sublabel: "Gate + EET", x: 328, y: 90, type: "supply" },
-    { key: "Gasopslag (4 sites)", label: "Opslag", sublabel: "4 locaties", x: 315, y: 535, type: "storage" },
-    { key: "Nationale productie", label: "Productie", sublabel: "Nederland", x: 535, y: 535, type: "supply" },
-    { key: "Binnenlands verbruik", label: "Verbruik", sublabel: "huishoudens + industrie", x: 735, y: 510, type: "consumption" },
+    { key: "LNG-terminals", label: "LNG", detail: "aanvoer via Gate + EET", x: 112, y: 574, type: "supply" },
+    { key: "Nationale productie", label: "Productie", detail: "Nederlandse productie", x: 307, y: 574, type: "supply" },
+    { key: "Gasopslag (4 sites)", label: "Opslag", detail: "naar vier opslaglocaties", x: 502, y: 574, type: "storage" },
+    { key: "Binnenlands verbruik", label: "Verbruik", detail: "huishoudens + industrie", x: 697, y: 574, type: "consumption" },
   ];
 
   const add = (tag, attrs = {}, text = "") => {
@@ -542,15 +561,26 @@ function createGasCountryBalanceMap(rows, quality = {}) {
     defs.appendChild(marker);
   }
 
+  for (let tileY = mapFrame.originTileY; tileY <= mapFrame.originTileY + 2; tileY += 1) {
+    for (let tileX = mapFrame.originTileX; tileX <= mapFrame.originTileX + 2; tileX += 1) {
+      add("image", {
+        x: mapFrame.x + (tileX - mapFrame.originTileX) * 256,
+        y: mapFrame.y + (tileY - mapFrame.originTileY) * 256,
+        width: 256,
+        height: 256,
+        href: `https://tile.openstreetmap.org/${mapFrame.zoom}/${tileX}/${tileY}.png`,
+        class: "gas-map-background",
+      });
+    }
+  }
+  add("rect", { x: mapFrame.x, y: mapFrame.y, width: mapFrame.width, height: mapFrame.height, rx: 18, class: "gas-map-background-wash" });
+  add("rect", { x: mapFrame.x, y: 496, width: mapFrame.width, height: 178, class: "gas-map-metric-wash" });
+
   add("text", { x: 26, y: 30, class: "gas-map-kicker" }, "GASSTROMEN · LAATSTE VOLLEDIGE GASDAG");
   add("circle", { cx: 572, cy: 25, r: 5, class: "gas-legend-import" });
   add("text", { x: 584, y: 30, class: "gas-map-legend" }, "naar het gasnet");
   add("circle", { cx: 696, cy: 25, r: 5, class: "gas-legend-export" });
   add("text", { x: 708, y: 30, class: "gas-map-legend" }, "uit het gasnet");
-
-  for (const country of countries) {
-    add("path", { d: country.d, class: `gas-country-shape${country.isNl ? " is-nl" : ""}` });
-  }
 
   const drawFlow = (key, anchor, type) => {
     const row = rowByName.get(key);
@@ -572,8 +602,7 @@ function createGasCountryBalanceMap(rows, quality = {}) {
     });
   };
 
-  for (const country of countries.filter((country) => !country.isNl)) drawFlow(country.key, country, "border");
-  for (const node of internalNodes) drawFlow(node.key, node, node.type);
+  for (const country of countries) drawFlow(country.key, country, "border");
 
   const flowLabel = (row, type) => {
     const value = Number(row?.value);
@@ -589,28 +618,33 @@ function createGasCountryBalanceMap(rows, quality = {}) {
   };
 
   for (const country of countries) {
-    const row = country.isNl ? null : rowByName.get(country.key);
-    add("text", { x: country.x, y: country.y - 4, "text-anchor": "middle", class: `gas-country-code${country.isNl ? " is-nl" : ""}` }, country.code);
-    add("text", { x: country.x, y: country.y + 14, "text-anchor": "middle", class: `gas-country-name${country.isNl ? " is-nl" : ""}` }, country.name);
-    if (!country.isNl) {
-      const value = Number(row?.value);
-      const isOut = row?.value !== null && row?.value !== undefined && Number.isFinite(value) && value < 0;
-      add("text", { x: country.x, y: country.y + 34, "text-anchor": "middle", class: `gas-country-flow${isOut ? " is-export" : ""}` }, flowLabel(row, "border"));
-    }
+    const row = rowByName.get(country.key);
+    const value = Number(row?.value);
+    const isOut = row?.value !== null && row?.value !== undefined && Number.isFinite(value) && value < 0;
+    add("rect", { x: country.labelX - 76, y: country.labelY - 31, width: 152, height: 70, rx: 14, class: "gas-country-chip" });
+    add("text", { x: country.labelX, y: country.labelY - 9, "text-anchor": "middle", class: "gas-country-code" }, country.code);
+    add("text", { x: country.labelX, y: country.labelY + 7, "text-anchor": "middle", class: "gas-country-name" }, country.name);
+    add("text", { x: country.labelX, y: country.labelY + 28, "text-anchor": "middle", class: `gas-country-flow${isOut ? " is-export" : ""}` }, flowLabel(row, "border"));
   }
 
   add("circle", { cx: NL.x, cy: NL.y, r: 31, class: "gas-map-hub-ring" });
   add("circle", { cx: NL.x, cy: NL.y, r: 23, class: "gas-map-hub" });
   add("text", { x: NL.x, y: NL.y + 5, "text-anchor": "middle", class: "gas-map-hub-title" }, "NL");
+  add("text", { x: NL.x, y: NL.y + 48, "text-anchor": "middle", class: "gas-map-nl-label" }, "Nederlands gasnet");
 
+  const metricSigned = (value) => `${value > 0 ? "+" : value < 0 ? "−" : ""}${Math.abs(value).toFixed(1)}`;
   for (const node of internalNodes) {
     const row = rowByName.get(node.key);
     const value = Number(row?.value);
     const isOut = row?.value !== null && row?.value !== undefined && Number.isFinite(value) && value < 0;
-    add("rect", { x: node.x - 69, y: node.y - 31, width: 138, height: 62, rx: 15, class: `gas-map-node gas-map-node-${node.type}` });
-    add("text", { x: node.x, y: node.y - 7, "text-anchor": "middle", class: "gas-map-code" }, node.label);
-    add("text", { x: node.x, y: node.y + 11, "text-anchor": "middle", class: "gas-map-name" }, node.sublabel);
-    add("text", { x: node.x, y: node.y + 49, "text-anchor": "middle", class: `gas-node-flow${isOut ? " is-export" : ""}` }, flowLabel(row, node.type));
+    add("rect", { x: node.x - 87, y: node.y - 62, width: 174, height: 124, rx: 18, class: `gas-map-node gas-map-node-${node.type}` });
+    add("text", { x: node.x, y: node.y - 34, "text-anchor": "middle", class: "gas-map-metric-label" }, node.label);
+    add("text", { x: node.x, y: node.y + 2, "text-anchor": "middle", class: `gas-map-metric-value${isOut ? " is-export" : ""}` }, Number.isFinite(value) ? `${metricSigned(value)} GWh/d` : "n/a");
+    add("text", { x: node.x, y: node.y + 26, "text-anchor": "middle", class: "gas-map-metric-detail" }, node.detail);
+    if (node.type === "storage") {
+      const storageFillPct = Number(quality?.storageFillPct);
+      add("text", { x: node.x, y: node.y + 48, "text-anchor": "middle", class: "gas-map-storage-fill" }, Number.isFinite(storageFillPct) ? `${storageFillPct.toFixed(1)}% gevuld` : "vulling onbekend");
+    }
   }
 
   const supply = Number(quality?.supplyGwhDay);
@@ -618,6 +652,7 @@ function createGasCountryBalanceMap(rows, quality = {}) {
   const difference = Number(quality?.differenceGwhDay);
   const differencePct = Number(quality?.differencePct);
   const balanceFinite = [supply, consumption, difference, differencePct].every(Number.isFinite);
+  const explainedPct = balanceFinite ? Math.max(0, 100 - Math.abs(differencePct)) : null;
   const signed = (value) => `${value > 0 ? "+" : value < 0 ? "−" : ""}${Math.abs(value).toFixed(1)}`;
 
   add("rect", { x: 825, y: 54, width: 230, height: 500, rx: 22, class: "gas-balance-panel" });
@@ -628,12 +663,12 @@ function createGasCountryBalanceMap(rows, quality = {}) {
   add("text", { x: 850, y: 190, class: "gas-balance-label" }, "Binnenlands verbruik");
   add("text", { x: 1030, y: 190, "text-anchor": "end", class: "gas-balance-value is-export" }, balanceFinite ? `−${consumption.toFixed(1)}` : "n/a");
   add("line", { x1: 850, y1: 215, x2: 1030, y2: 215, class: "gas-balance-rule" });
-  add("text", { x: 850, y: 252, class: "gas-balance-label strong" }, "Restbalans");
+  add("text", { x: 850, y: 252, class: "gas-balance-label strong" }, "Restcheck");
   add("text", { x: 1030, y: 252, "text-anchor": "end", class: "gas-balance-total" }, balanceFinite ? signed(difference) : "n/a");
   add("text", { x: 1030, y: 276, "text-anchor": "end", class: "gas-balance-unit" }, "GWh/d");
   add("rect", { x: 850, y: 301, width: 180, height: 54, rx: 13, class: balanceFinite && Math.abs(differencePct) <= 15 ? "gas-balance-ok" : "gas-balance-warning" });
-  add("text", { x: 940, y: 324, "text-anchor": "middle", class: "gas-balance-status" }, balanceFinite && Math.abs(differencePct) <= 15 ? "≈ 0 · balans sluit" : "controle nodig");
-  add("text", { x: 940, y: 344, "text-anchor": "middle", class: "gas-balance-percent" }, balanceFinite ? `${signed(differencePct)}% meetverschil` : "onvoldoende data");
+  add("text", { x: 940, y: 324, "text-anchor": "middle", class: "gas-balance-status" }, explainedPct === null ? "controle nodig" : `${explainedPct.toFixed(1)}% verklaard`);
+  add("text", { x: 940, y: 344, "text-anchor": "middle", class: "gas-balance-percent" }, balanceFinite && Math.abs(differencePct) <= 15 ? "balans vrijwel compleet" : "extra controle nodig");
   add("text", { x: 850, y: 386, class: "gas-balance-breakdown-title" }, "OPBOUW NETTO AANVOER");
   const breakdown = [
     ["Grenssaldo", Number(quality?.borderNetGwhDay)],
@@ -648,7 +683,8 @@ function createGasCountryBalanceMap(rows, quality = {}) {
   });
   add("text", { x: 850, y: 520, class: "gas-balance-note" }, "Restverschil: linepack + meetmomenten.");
 
-  add("text", { x: 26, y: 680, class: "gas-map-footnote" }, "Pijldikte = relatieve omvang. Positief is naar het gasnet; negatief is export, opslagvulling of binnenlands verbruik.");
+  add("text", { x: 26, y: 689, class: "gas-map-footnote" }, "Pijldikte = relatieve grensstroom. Interne stromen staan in de vier blokken.");
+  add("text", { x: 790, y: 689, "text-anchor": "end", class: "gas-map-attribution" }, "Kaart © OpenStreetMap-bijdragers");
   return svg;
 }
 
@@ -955,7 +991,10 @@ function createCard(item) {
     shownValue = `${formatNumberFixed2(item.value)} ${item.unit}`;
   }
   if (item.id === "nlGasImport" && Number.isFinite(Number(item.value))) {
-    shownValue = `Restbalans ${formatNumberFixed2(item.value)} ${item.unit}`;
+    const explainedPct = Number.isFinite(Number(item.quality?.differencePct))
+      ? Math.max(0, 100 - Math.abs(Number(item.quality.differencePct)))
+      : null;
+    shownValue = explainedPct === null ? shownValue : `${explainedPct.toFixed(1)}% van de gasbalans verklaard`;
   }
   node.querySelector(".card-value").textContent = item.valueText ? item.valueText : shownValue;
   const detail = item.detail ? ` · ${item.detail}` : "";
@@ -1081,7 +1120,7 @@ function splitItems(items) {
     return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib);
   });
 
-  const gasWholesaleOrder = ["nlGasConsumptionBreakdown", "nlGasStorage", "nlGasProduction", "ttfGas", "ets", "gaslichtGas"];
+  const gasWholesaleOrder = ["ttfGas", "ets", "gaslichtGas"];
   gas.wholesale.sort((a, b) => {
     const ia = gasWholesaleOrder.indexOf(a.id);
     const ib = gasWholesaleOrder.indexOf(b.id);
