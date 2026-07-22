@@ -1,5 +1,5 @@
 const urlParams = new URLSearchParams(window.location.search);
-const BUILD_TAG = "2026-07-22-07";
+const BUILD_TAG = "2026-07-22-08";
 const isLandscapeMode = urlParams.get("landscape") === "1";
 const isWidgetMode = urlParams.get("widget") === "1";
 const initialPageParamRaw = urlParams.get("page");
@@ -33,8 +33,8 @@ const pagePanels = {
   gas: document.getElementById("page-gas"),
 };
 
-const ELECTRICITY_DEMAND_IDS = new Set(["nlCrossBorderFlows", "dayAheadPower24h", "nlGenerationMixShare"]);
-const ELECTRICITY_WHOLESALE_IDS = new Set(["tennetSettlement", "ets", "gaslichtElectricity"]);
+const ELECTRICITY_DEMAND_IDS = new Set(["nlCrossBorderFlows", "dayAheadPower24h"]);
+const ELECTRICITY_WHOLESALE_IDS = new Set(["ets", "gaslichtElectricity"]);
 const ELECTRICITY_RETAIL_IDS = new Set([]);
 
 const GAS_DEMAND_IDS = new Set(["nlGasImport"]);
@@ -43,13 +43,12 @@ const GAS_RETAIL_IDS = new Set([]);
 
 const CARD_EXPLANATIONS = {
   nlCrossBorderFlows: "Fysieke uitwisseling via Nederlandse stroomverbindingen. Positief is netto import; negatief is netto export.",
-  dayAheadPower24h: "Beschikbare day-aheadprijzen vanaf het huidige uur. Kwartierprijzen zijn per leveringsuur gemiddeld; exclusief belasting en netkosten.",
+  dayAheadPower24h: "Alle leveringsuren van vandaag. Deze prijzen zijn gisteren in de day-aheadveiling vastgesteld; exclusief belasting en netkosten.",
   nlGenerationMixShare: "Aandeel van de actuele Nederlandse productie per bron. De percentages tellen op tot 100% van de getoonde productiecategorieën.",
   nlElectricityOverview: "Het actuele totale elektriciteitsverbruik dat door ENTSO-E voor Nederland wordt gemeten.",
   nlGridFrequency: "De netfrequentie hoort rond 50 Hz te blijven; kleine afwijkingen tonen de directe balans tussen productie en verbruik.",
   tennetRegulation: "Onbalanssignaal van TenneT. Het toont hoeveel regelvermogen op dit moment wordt ingezet.",
   ets: "Prijs van een Europees emissierecht voor één ton CO₂; dit is een termijnmarktprijs.",
-  tennetSettlement: "TenneT-onbalansprijs per kwartier. De titel en toelichting geven aan of het een definitieve settlement of een actuele indicatie is.",
   gaslichtElectricity: "Consumentenreferentie inclusief belastingen; niet rechtstreeks vergelijkbaar met de EPEX-groothandelsprijs.",
   nlGasImport: "Alle getoonde aanvoer minus opslagvulling en binnenlands verbruik. De kleine restbalans hoort rond nul te liggen.",
   nlGasConsumptionBreakdown: "Geschat Nederlands dagverbruik uit distributie, industrie en gascentrales op dezelfde volledige gasdag.",
@@ -122,8 +121,8 @@ function createDayAheadChart(rows) {
   const valid = rows.map((r, i) => ({ i, value: Number(r.value) })).filter((p) => Number.isFinite(p.value));
   if (valid.length < 2) return null;
 
-  const width = 980;
-  const height = 420;
+  const width = 1500;
+  const height = 180;
   const m = { top: 14, right: 14, bottom: 36, left: 52 };
   const innerW = width - m.left - m.right;
   const innerH = height - m.top - m.bottom;
@@ -330,7 +329,6 @@ function createElectricityCountryMap(rows, quality = {}) {
   const borderNetMw = Number(quality?.borderNetMw);
   const frequencyHz = Number(quality?.frequencyHz);
   const regulationMw = Number(quality?.regulationMw);
-  const generationMw = Number(quality?.generationMw);
   const borderIsImport = Number.isFinite(borderNetMw) && borderNetMw >= 0;
   const regulationIsUp = Number.isFinite(regulationMw) && regulationMw >= 0;
   const deviationMhz = Number.isFinite(frequencyHz) ? Math.round((frequencyHz - 50) * 1000) : null;
@@ -350,11 +348,9 @@ function createElectricityCountryMap(rows, quality = {}) {
   metric("Grenssaldo", Number.isFinite(borderNetMw) ? `${(Math.abs(borderNetMw) / 1000).toFixed(1)} GW` : "n/a", borderIsImport ? "netto import" : "netto export", 222, borderIsImport ? "is-import" : "is-export");
   metric("Netfrequentie", Number.isFinite(frequencyHz) ? `${frequencyHz.toFixed(3)} Hz` : "n/a", signedMhz, 293, frequencyOkay ? "is-import" : "is-export");
   metric("Regelvermogen", Number.isFinite(regulationMw) ? `${Math.abs(regulationMw).toFixed(0)} MW` : "n/a", regulationIsUp ? "opregelen" : "afregelen", 364, regulationIsUp ? "is-import" : "is-export");
-  metric("Nederlandse opwek", Number.isFinite(generationMw) ? `${(generationMw / 1000).toFixed(1)} GW` : "n/a", "NED-productietotaal", 435);
-
-  add("rect", { x: 850, y: 500, width: 180, height: 34, rx: 11, class: frequencyOkay ? "gas-balance-ok" : "gas-balance-warning" });
-  add("text", { x: 940, y: 522, "text-anchor": "middle", class: "gas-balance-status" }, frequencyOkay ? "frequentie normaal" : "frequentie controleren");
-  add("text", { x: 26, y: 611, class: "gas-map-footnote" }, "Lijndikte = omvang; kleur = richting. Grensstromen zijn fysieke ENTSO-E-metingen; meetmomenten kunnen per verbinding verschillen.");
+  add("rect", { x: 850, y: 458, width: 180, height: 42, rx: 11, class: frequencyOkay ? "gas-balance-ok" : "gas-balance-warning" });
+  add("text", { x: 940, y: 484, "text-anchor": "middle", class: "gas-balance-status" }, frequencyOkay ? "frequentie normaal" : "frequentie controleren");
+  add("text", { x: 26, y: 611, class: "gas-map-footnote" }, "Lijndikte = omvang; kleur = richting. Meetmomenten kunnen per verbinding verschillen.");
   add("text", { x: 790, y: 611, "text-anchor": "end", class: "gas-map-attribution" }, "Kaart © OpenStreetMap-bijdragers");
   return svg;
 }
@@ -1239,14 +1235,14 @@ function splitItems(items) {
     else if (GAS_RETAIL_IDS.has(item.id)) gas.retail.push(item);
   }
 
-  const electricityDemandOrder = ["nlCrossBorderFlows", "dayAheadPower24h", "nlGenerationMixShare"];
+  const electricityDemandOrder = ["nlCrossBorderFlows", "dayAheadPower24h"];
   electricity.demand.sort((a, b) => {
     const ia = electricityDemandOrder.indexOf(a.id);
     const ib = electricityDemandOrder.indexOf(b.id);
     return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib);
   });
 
-  const electricityWholesaleOrder = ["tennetSettlement", "ets", "gaslichtElectricity"];
+  const electricityWholesaleOrder = ["ets", "gaslichtElectricity"];
   electricity.wholesale.sort((a, b) => {
     const ia = electricityWholesaleOrder.indexOf(a.id);
     const ib = electricityWholesaleOrder.indexOf(b.id);

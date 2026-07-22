@@ -295,11 +295,6 @@ async function getDayAheadPower24h() {
       samples: values.length,
     }))
     .sort((a, b) => a.dt - b.dt);
-  const nowHourUtc = new Date();
-  nowHourUtc.setUTCMinutes(0, 0, 0);
-  let selected = hourly.filter((point) => point.dt >= nowHourUtc).slice(0, 24);
-  if (selected.length < 2) selected = hourly.slice(-24);
-
   const localDate = (date) => new Intl.DateTimeFormat('nl-NL', {
     timeZone: 'Europe/Amsterdam', day: '2-digit', month: '2-digit', year: 'numeric',
   }).format(date);
@@ -307,30 +302,31 @@ async function getDayAheadPower24h() {
     timeZone: 'Europe/Amsterdam', hour: '2-digit', minute: '2-digit', hour12: false,
   }).format(date);
   const todayKey = localDate(new Date());
-  const tomorrowKey = localDate(new Date(Date.now() + 24 * 3600_000));
+  const selected = hourly.filter((point) => localDate(point.dt) === todayKey);
+  if (selected.length < 2) throw new Error('No day-ahead prices for the current Dutch delivery day');
   const rows = selected.map((point) => {
-    const dateKey = localDate(point.dt);
-    const prefix = dateKey === todayKey ? 'Vandaag' : dateKey === tomorrowKey ? 'Morgen' : dateKey.slice(0, 5);
     return {
-      hour: `${prefix} ${localHour(point.dt)}`,
+      hour: `Vandaag ${localHour(point.dt)}`,
       value: point.value,
       unit: 'EUR/MWh',
       timestamp: point.dt.toISOString(),
       samples: point.samples,
     };
   });
+  const nowHourUtc = new Date();
+  nowHourUtc.setUTCMinutes(0, 0, 0);
   const nowRow = rows.find((row) => row.timestamp === nowHourUtc.toISOString());
   const first = rows[0];
 
   return {
     id: 'dayAheadPower24h',
-    label: 'EPEX Day-Ahead NL',
+    label: 'Stroomprijs vandaag (day-ahead)',
     value: nowRow?.value ?? first?.value ?? null,
     unit: 'EUR/MWh',
     source: 'ENTSO-E Transparency API (EPEX SPOT NL)',
     sourceUrl: url,
     updatedAt: new Date().toISOString(),
-    detail: `${rows.length} beschikbare leveringsuren vanaf nu; kwartierprijzen gemiddeld per uur`,
+    detail: `${rows.length} leveringsuren van vandaag; gisteren vastgesteld, kwartierprijzen gemiddeld per uur`,
     dataStatus: 'verified',
     statusMessage: `${rows.reduce((sum, row) => sum + row.samples, 0)} ENTSO-E-prijspunten gecontroleerd`,
     rows,
@@ -1650,12 +1646,11 @@ async function collectOverview() {
   const previousById = loadPreviousOverviewMap();
 
   const fallbackRows24 = Array.from({ length: 24 }, (_, i) => {
-    const d = new Date(Date.now() + i * 3600_000);
-    return { hour: `${String(d.getHours()).padStart(2, '0')}:00`, value: null, unit: 'EUR/MWh' };
+    return { hour: `Vandaag ${String(i).padStart(2, '0')}:00`, value: null, unit: 'EUR/MWh' };
   });
 
   const tasks = [
-    [getDayAheadPower24h, { id: 'dayAheadPower24h', label: 'EPEX Day-Ahead NL', value: null, unit: 'EUR/MWh', source: 'ENTSO-E Transparency API (EPEX SPOT NL)', sourceUrl: ENTSOE_BASE, updatedAt: new Date().toISOString(), detail: 'Bron tijdelijk niet bereikbaar', rows: fallbackRows24 }],
+    [getDayAheadPower24h, { id: 'dayAheadPower24h', label: 'Stroomprijs vandaag (day-ahead)', value: null, unit: 'EUR/MWh', source: 'ENTSO-E Transparency API (EPEX SPOT NL)', sourceUrl: ENTSOE_BASE, updatedAt: new Date().toISOString(), detail: 'Bron tijdelijk niet bereikbaar', rows: fallbackRows24 }],
     [getTTFGas, { id: 'ttfGas', label: 'TTF Gas', value: null, unit: 'EUR/MWh', source: 'TradingEconomics', sourceUrl: 'https://tradingeconomics.com/commodity/eu-natural-gas', updatedAt: new Date().toISOString(), detail: 'Bron tijdelijk niet bereikbaar' }],
     [getETSPrice, { id: 'ets', label: 'EU ETS (ICE EUA frontcontract)', value: null, unit: 'EUR/tCO2', source: 'Barchart', sourceUrl: 'https://www.barchart.com/futures/quotes/CK*0', updatedAt: new Date().toISOString(), detail: 'Bron tijdelijk niet bereikbaar' }],
     [getNlGasImport, { id: 'nlGasImport', label: 'Netto in- en uitstroom aardgas', value: null, unit: 'GWh/d', source: 'ENTSOG API', sourceUrl: ENTSOG_BASE, updatedAt: new Date().toISOString(), detail: 'Bron tijdelijk niet bereikbaar', rows: [{ hour: 'Belgie', value: null, unit: 'GWh/d' }, { hour: 'Duitsland', value: null, unit: 'GWh/d' }, { hour: 'Verenigd Koninkrijk', value: null, unit: 'GWh/d' }, { hour: 'Noorwegen', value: null, unit: 'GWh/d' }, { hour: 'LNG (Gate+EET)', value: null, unit: 'GWh/d' }, { hour: 'Gasopslag (4 sites)', value: null, unit: 'GWh/d' }, { hour: 'Nationale productie', value: null, unit: 'GWh/d' }] }],
@@ -1663,7 +1658,6 @@ async function collectOverview() {
     [getEntsoeCrossBorderFlows, { id: 'nlCrossBorderFlows', label: 'Elektriciteitsstromen Nederland', value: null, unit: 'MW', source: 'ENTSO-E Transparency API', sourceUrl: ENTSOE_BASE, updatedAt: new Date().toISOString(), detail: 'Bron tijdelijk niet bereikbaar', rows: [{ hour: 'Belgie', value: null, unit: 'MW' }, { hour: 'Duitsland', value: null, unit: 'MW' }, { hour: 'Verenigd Koninkrijk', value: null, unit: 'MW' }, { hour: 'Denemarken', value: null, unit: 'MW' }, { hour: 'Noorwegen', value: null, unit: 'MW' }] }],
     [getNlGasStorage, { id: 'nlGasStorage', label: 'NL Gasopslag (actueel)', value: null, unit: '%', source: 'NED API', sourceUrl: 'https://api.ned.nl/v1/utilizations', updatedAt: new Date().toISOString(), detail: 'Bron tijdelijk niet bereikbaar' }],
     [getEntsoeElectricityOverview, { id: 'nlElectricityOverview', label: 'Elektriciteit NL (actuele load)', value: null, unit: 'MW', source: 'ENTSO-E Transparency API', sourceUrl: ENTSOE_BASE, updatedAt: new Date().toISOString(), detail: 'Bron tijdelijk niet bereikbaar', rows: [] }],
-    [getGenerationMixShare, { id: 'nlGenerationMixShare', label: 'Opwekmix Nederland', value: null, unit: '', valueText: 'Verdeling per bron', source: 'ENTSO-E Transparency API', sourceUrl: ENTSOE_BASE, updatedAt: new Date().toISOString(), detail: 'Bron tijdelijk niet bereikbaar', rows: [] }],
     [getGridFrequency, { id: 'nlGridFrequency', label: 'Netfrequentie NL (actueel)', value: null, unit: 'Hz', source: 'mainsfrequency.com', sourceUrl: 'https://mainsfrequency.com', updatedAt: new Date().toISOString(), detail: 'Bron tijdelijk niet bereikbaar' }],
     [async () => {
       try {
@@ -1673,7 +1667,6 @@ async function collectOverview() {
       }
     }, { id: 'nlGasConsumptionBreakdown', label: 'Gasconsumptie NL (laatste volledige dag)', value: null, unit: 'GWh/d', source: 'NED API', sourceUrl: 'https://api.ned.nl/v1/utilizations', updatedAt: new Date().toISOString(), detail: 'Bron tijdelijk niet bereikbaar', rows: [] }],
     [getTennetRegulation, { id: 'tennetRegulation', label: 'Regelvermogen TenneT (actueel)', value: null, unit: 'MW', source: 'TenneT API (Balance Delta High Res)', sourceUrl: 'https://api.tennet.eu/publications/v1/balance-delta-high-res/latest', updatedAt: new Date().toISOString(), detail: 'Bron tijdelijk niet bereikbaar' }],
-    [getTennetSettlement, { id: 'tennetSettlement', label: 'Onbalansprijs TenneT', value: null, unit: 'EUR/MWh', source: 'TenneT API (Settlement Prices)', sourceUrl: 'https://api.tennet.eu/publications/v1/settlement-prices', updatedAt: new Date().toISOString(), detail: 'Bron tijdelijk niet bereikbaar' }],
     [getOverstappenElectricityReference, { id: 'gaslichtElectricity', label: 'Stroom referentieprijs (Overstappen.nl)', value: null, unit: 'EUR/kWh', source: 'Overstappen.nl', sourceUrl: OVERSTAPPEN_POWER_URL, updatedAt: new Date().toISOString(), detail: 'Bron tijdelijk niet bereikbaar' }],
     [getOverstappenGasReference, { id: 'gaslichtGas', label: 'Gas referentieprijs (Overstappen.nl)', value: null, unit: 'EUR/m3', source: 'Overstappen.nl', sourceUrl: OVERSTAPPEN_GAS_URL, updatedAt: new Date().toISOString(), detail: 'Bron tijdelijk niet bereikbaar' }],
   ];
@@ -1704,16 +1697,11 @@ async function collectOverview() {
   const electricityLoad = items.find((item) => item?.id === 'nlElectricityOverview');
   const gridFrequency = items.find((item) => item?.id === 'nlGridFrequency');
   const regulation = items.find((item) => item?.id === 'tennetRegulation');
-  const generationMix = items.find((item) => item?.id === 'nlGenerationMixShare');
   if (electricityFlow) {
     const borderNetMw = toNumber(electricityFlow.value);
     const loadMw = toNumber(electricityLoad?.value);
     const frequencyHz = toNumber(gridFrequency?.value);
     const regulationMw = toNumber(regulation?.value);
-    const generationMw = toNumber(generationMix?.quality?.totalGenerationMw);
-    const balanceDifferenceMw = generationMw !== null && borderNetMw !== null && loadMw !== null
-      ? generationMw + borderNetMw - loadMw
-      : null;
     electricityFlow.quality = {
       borderNetMw,
       loadMw,
@@ -1722,9 +1710,6 @@ async function collectOverview() {
       frequencyUpdatedAt: gridFrequency?.updatedAt || null,
       regulationMw,
       regulationUpdatedAt: regulation?.updatedAt || null,
-      generationMw,
-      generationUpdatedAt: generationMix?.updatedAt || null,
-      balanceDifferenceMw,
     };
     const borderText = borderNetMw === null
       ? 'grenssaldo onbekend'

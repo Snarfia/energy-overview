@@ -132,39 +132,56 @@ button:hover { filter: brightness(1.05); }
 }
 
 #page-electricity .block-demand .cards {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  grid-template-rows: minmax(0, 1.45fr) minmax(0, 0.85fr);
+  grid-template-columns: 1fr;
+  grid-template-rows: minmax(0, 2.1fr) minmax(0, 0.9fr);
   height: 100%;
 }
 
 #page-electricity .block-wholesale .cards {
   flex: 1;
   grid-template-columns: 1fr;
-  grid-template-rows: repeat(3, minmax(0, 1fr));
+  grid-template-rows: repeat(2, minmax(0, 1fr));
   overflow-y: auto;
   padding-right: 0.2rem;
 }
 
 #page-electricity .card[data-card-id="nlCrossBorderFlows"] {
-  grid-column: 1 / -1;
+  position: relative;
   display: flex;
   flex-direction: column;
+  padding-top: 0.25rem;
+}
+
+#page-electricity .card[data-card-id="nlCrossBorderFlows"] .card-title,
+#page-electricity .card[data-card-id="nlCrossBorderFlows"] .card-value,
+#page-electricity .card[data-card-id="nlCrossBorderFlows"] .card-explainer,
+#page-electricity .card[data-card-id="nlCrossBorderFlows"] .card-meta,
+#page-electricity .card[data-card-id="nlCrossBorderFlows"] .card-source {
+  display: none;
+}
+
+#page-electricity .card[data-card-id="nlCrossBorderFlows"] .card-heading {
+  position: absolute;
+  z-index: 2;
+  top: 0.65rem;
+  right: 0.75rem;
 }
 
 #page-electricity .card[data-card-id="nlCrossBorderFlows"] .flow-map {
   flex: 1;
-  min-height: 280px;
+  min-height: 360px;
   height: 100%;
+  margin-top: 0;
+  border-top: 0;
+  padding-top: 0;
 }
 
-#page-electricity .card[data-card-id="dayAheadPower24h"],
-#page-electricity .card[data-card-id="nlGenerationMixShare"] {
+#page-electricity .card[data-card-id="dayAheadPower24h"] {
   display: flex;
   flex-direction: column;
 }
 
-#page-electricity .card[data-card-id="dayAheadPower24h"] .dayahead-chart,
-#page-electricity .card[data-card-id="nlGenerationMixShare"] .pie-wrap {
+#page-electricity .card[data-card-id="dayAheadPower24h"] .dayahead-chart {
   flex: 1;
   min-height: 0;
 }
@@ -475,7 +492,11 @@ button:hover { filter: brightness(1.05); }
   #page-gas.page-panel.active {
     grid-template-columns: minmax(0, 2.75fr) minmax(420px, 0.9fr);
   }
-  #page-electricity .block-wholesale .cards,
+  #page-electricity .block-wholesale .cards {
+    grid-template-columns: 1fr;
+    grid-template-rows: repeat(2, minmax(0, 1fr));
+    height: 100%;
+  }
   #page-gas .block-wholesale .cards {
     grid-template-columns: 1fr;
     grid-template-rows: repeat(3, minmax(0, 1fr));

@@ -1,19 +1,89 @@
 {
-  "generatedAt": "2026-07-22T08:48:30.929Z",
-  "durationMs": 18801,
+  "generatedAt": "2026-07-22T09:06:34.907Z",
+  "durationMs": 32722,
   "items": [
     {
       "id": "dayAheadPower24h",
-      "label": "EPEX Day-Ahead NL",
-      "value": 75.7,
+      "label": "Stroomprijs vandaag (day-ahead)",
+      "value": 43.227500000000006,
       "unit": "EUR/MWh",
       "source": "ENTSO-E Transparency API (EPEX SPOT NL)",
       "sourceUrl": "https://web-api.tp.entsoe.eu/api",
-      "updatedAt": "2026-07-22T08:48:15.967Z",
-      "detail": "14 beschikbare leveringsuren vanaf nu; kwartierprijzen gemiddeld per uur",
+      "updatedAt": "2026-07-22T09:06:04.888Z",
+      "detail": "24 leveringsuren van vandaag; gisteren vastgesteld, kwartierprijzen gemiddeld per uur",
       "dataStatus": "verified",
-      "statusMessage": "56 ENTSO-E-prijspunten gecontroleerd",
+      "statusMessage": "96 ENTSO-E-prijspunten gecontroleerd",
       "rows": [
+        {
+          "hour": "Vandaag 00:00",
+          "value": 154.255,
+          "unit": "EUR/MWh",
+          "timestamp": "2026-07-21T22:00:00.000Z",
+          "samples": 4
+        },
+        {
+          "hour": "Vandaag 01:00",
+          "value": 150.82,
+          "unit": "EUR/MWh",
+          "timestamp": "2026-07-21T23:00:00.000Z",
+          "samples": 4
+        },
+        {
+          "hour": "Vandaag 02:00",
+          "value": 145.8375,
+          "unit": "EUR/MWh",
+          "timestamp": "2026-07-22T00:00:00.000Z",
+          "samples": 4
+        },
+        {
+          "hour": "Vandaag 03:00",
+          "value": 136.9625,
+          "unit": "EUR/MWh",
+          "timestamp": "2026-07-22T01:00:00.000Z",
+          "samples": 4
+        },
+        {
+          "hour": "Vandaag 04:00",
+          "value": 132.505,
+          "unit": "EUR/MWh",
+          "timestamp": "2026-07-22T02:00:00.000Z",
+          "samples": 4
+        },
+        {
+          "hour": "Vandaag 05:00",
+          "value": 139.565,
+          "unit": "EUR/MWh",
+          "timestamp": "2026-07-22T03:00:00.000Z",
+          "samples": 4
+        },
+        {
+          "hour": "Vandaag 06:00",
+          "value": 153.59,
+          "unit": "EUR/MWh",
+          "timestamp": "2026-07-22T04:00:00.000Z",
+          "samples": 4
+        },
+        {
+          "hour": "Vandaag 07:00",
+          "value": 148.99,
+          "unit": "EUR/MWh",
+          "timestamp": "2026-07-22T05:00:00.000Z",
+          "samples": 4
+        },
+        {
+          "hour": "Vandaag 08:00",
+          "value": 134.51500000000001,
+          "unit": "EUR/MWh",
+          "timestamp": "2026-07-22T06:00:00.000Z",
+          "samples": 4
+        },
+        {
+          "hour": "Vandaag 09:00",
+          "value": 100.85499999999999,
+          "unit": "EUR/MWh",
+          "timestamp": "2026-07-22T07:00:00.000Z",
+          "samples": 4
+        },
         {
           "hour": "Vandaag 10:00",
           "value": 75.7,
@@ -117,21 +187,21 @@
     {
       "id": "ttfGas",
       "label": "TTF Gas",
-      "value": 61.7699,
+      "value": 61.8289,
       "unit": "EUR/MWh",
       "source": "TradingEconomics",
       "sourceUrl": "https://tradingeconomics.com/commodity/eu-natural-gas",
-      "updatedAt": "2026-07-22T08:48:16.016Z"
+      "updatedAt": "2026-07-22T09:06:04.982Z"
     },
     {
       "id": "ets",
       "label": "EU ETS (ICE EUA frontcontract)",
-      "value": 84.22,
+      "value": 85.07,
       "unit": "EUR/tCO2",
       "source": "Barchart",
       "sourceUrl": "https://www.barchart.com/futures/quotes/CK*0",
-      "updatedAt": "2026-07-22T08:48:18.148Z",
-      "detail": "Doorlopend EUA-frontcontract CKZ26 | laatste handel 03:37 CT"
+      "updatedAt": "2026-07-22T09:06:05.585Z",
+      "detail": "Doorlopend EUA-frontcontract CKZ26 | laatste handel 03:55 CT"
     },
     {
       "id": "nlGasImport",
@@ -232,57 +302,54 @@
     {
       "id": "nlCrossBorderFlows",
       "label": "Elektriciteitsstromen Nederland",
-      "value": -915.9736950000004,
+      "value": -228.4229190000001,
       "unit": "MW",
       "source": "ENTSO-E Transparency API",
       "sourceUrl": "https://web-api.tp.entsoe.eu/api",
-      "updatedAt": "2026-07-22T02:00:00.000Z",
-      "detail": "netto export 0.9 GW | actuele systeembelasting 9.5 GW",
+      "updatedAt": "2026-07-22T03:00:00.000Z",
+      "detail": "netto export 0.2 GW | actuele systeembelasting 8.9 GW",
       "dataStatus": "warning",
-      "statusMessage": "5 fysieke corridors; meetmomenten lopen 3.5 uur uiteen",
+      "statusMessage": "5 fysieke corridors; meetmomenten lopen 2.5 uur uiteen",
       "rows": [
         {
           "hour": "Belgie",
-          "value": 2904.9625,
+          "value": 2338.449,
           "unit": "MW",
-          "updatedAt": "2026-07-22T02:00:00.000Z"
+          "updatedAt": "2026-07-22T03:00:00.000Z"
         },
         {
           "hour": "Duitsland",
-          "value": -4197.28667,
+          "value": -2982.86,
           "unit": "MW",
           "updatedAt": "2026-07-22T05:30:00.000Z"
         },
         {
           "hour": "Verenigd Koninkrijk",
-          "value": 1074.23,
+          "value": 1073.77,
           "unit": "MW",
           "updatedAt": "2026-07-22T05:00:00.000Z"
         },
         {
           "hour": "Denemarken",
-          "value": -697.48,
+          "value": -677.23,
           "unit": "MW",
-          "updatedAt": "2026-07-22T02:00:00.000Z"
+          "updatedAt": "2026-07-22T03:00:00.000Z"
         },
         {
           "hour": "Noorwegen",
-          "value": -0.399525,
+          "value": 19.448081,
           "unit": "MW",
-          "updatedAt": "2026-07-22T02:00:00.000Z"
+          "updatedAt": "2026-07-22T03:00:00.000Z"
         }
       ],
       "quality": {
-        "borderNetMw": -915.9736950000004,
-        "loadMw": 9534.606,
-        "loadUpdatedAt": "2026-07-22T08:00:00.000Z",
-        "frequencyHz": 50.002,
-        "frequencyUpdatedAt": "2026-07-22T08:48:20.000Z",
-        "regulationMw": -1488.5,
-        "regulationUpdatedAt": "2026-07-22T08:46:12Z",
-        "generationMw": 15052.708,
-        "generationUpdatedAt": "2026-07-22T08:30:00.000Z",
-        "balanceDifferenceMw": 4602.128305
+        "borderNetMw": -228.4229190000001,
+        "loadMw": 8884.956,
+        "loadUpdatedAt": "2026-07-22T08:15:00.000Z",
+        "frequencyHz": 49.972,
+        "frequencyUpdatedAt": "2026-07-22T09:06:25.000Z",
+        "regulationMw": -613,
+        "regulationUpdatedAt": "2026-07-22T09:04:24Z"
       }
     },
     {
@@ -292,7 +359,7 @@
       "unit": "%",
       "source": "NED Website",
       "sourceUrl": "https://ned.nl/nl/gasopslagen-nederland",
-      "updatedAt": "2026-07-22T08:48:27.581Z",
+      "updatedAt": "2026-07-22T09:06:32.920Z",
       "detail": "Actuele nationale vullingsgraad van NED",
       "rows": [
         {
@@ -305,97 +372,23 @@
     {
       "id": "nlElectricityOverview",
       "label": "Elektriciteit NL (actuele load)",
-      "value": 9534.606,
+      "value": 8884.956,
       "unit": "MW",
       "source": "ENTSO-E Transparency API",
       "sourceUrl": "https://web-api.tp.entsoe.eu/api",
-      "updatedAt": "2026-07-22T08:00:00.000Z",
+      "updatedAt": "2026-07-22T08:15:00.000Z",
       "detail": "Actuele load uit ENTSO-E",
       "rows": []
     },
     {
-      "id": "nlGenerationMixShare",
-      "label": "Nederlandse productiemix",
-      "value": null,
-      "unit": "",
-      "valueText": "Verhouding per bron",
-      "source": "NED API",
-      "sourceUrl": "https://api.ned.nl/v1/utilizations?classification=2&validfrom%5Bstrictly_before%5D=2026-07-23&point=0&granularity=4&granularitytimezone=0&validfrom%5Bafter%5D=2026-07-22&itemsPerPage=200&type=27&activity=1",
-      "updatedAt": "2026-07-22T08:30:00.000Z",
-      "detail": "Verdeling tegen officieel NED-totaal 15053 MW; niet afzonderlijk gepubliceerde productie staat onder Overig",
-      "dataStatus": "verified",
-      "statusMessage": "9 categorieën sluiten aan op NED ElectricityMix totaal",
-      "quality": {
-        "totalGenerationMw": 15052.708,
-        "categorizedGenerationMw": 12550.112999999998,
-        "residualGenerationMw": 2502.595000000003
-      },
-      "rows": [
-        {
-          "hour": "Gascentrales",
-          "value": 7.535268737027251,
-          "unit": "%",
-          "mw": 1134.262
-        },
-        {
-          "hour": "WKK",
-          "value": 7.579573057552169,
-          "unit": "%",
-          "mw": 1140.931
-        },
-        {
-          "hour": "Kolencentrales",
-          "value": 7.60718270758989,
-          "unit": "%",
-          "mw": 1145.087
-        },
-        {
-          "hour": "Afval",
-          "value": 2.126016129456574,
-          "unit": "%",
-          "mw": 320.023
-        },
-        {
-          "hour": "Zon",
-          "value": 39.430340374635584,
-          "unit": "%",
-          "mw": 5935.334
-        },
-        {
-          "hour": "Wind op zee",
-          "value": 12.853952923287956,
-          "unit": "%",
-          "mw": 1934.868
-        },
-        {
-          "hour": "Biomassa",
-          "value": 3.165397216235112,
-          "unit": "%",
-          "mw": 476.478
-        },
-        {
-          "hour": "Kernenergie",
-          "value": 3.076722141956118,
-          "unit": "%",
-          "mw": 463.13
-        },
-        {
-          "hour": "Overig / niet uitgesplitst",
-          "value": 16.625546712259368,
-          "unit": "%",
-          "mw": 2502.595000000003
-        }
-      ]
-    },
-    {
       "id": "nlGridFrequency",
       "label": "Netfrequentie NL (actueel)",
-      "value": 50.002,
+      "value": 49.972,
       "unit": "Hz",
       "source": "mainsfrequency.com",
       "sourceUrl": "https://mainsfrequency.com/",
-      "updatedAt": "2026-07-22T08:48:20.000Z",
-      "detail": "Europese synchrone netfrequentie; afwijking +2 mHz",
+      "updatedAt": "2026-07-22T09:06:25.000Z",
+      "detail": "Europese synchrone netfrequentie; afwijking -28 mHz",
       "dataStatus": "verified",
       "statusMessage": "Rechtstreeks uit het live meetbestand; niet uit de statische 50 Hz-doelwaarde"
     },
@@ -415,26 +408,14 @@
     {
       "id": "tennetRegulation",
       "label": "Regelvermogen TenneT (actueel)",
-      "value": -1488.5,
+      "value": -613,
       "unit": "MW",
       "source": "TenneT API (Balance Delta High Res)",
       "sourceUrl": "https://api.tennet.eu/publications/v1/balance-delta-high-res/latest",
-      "updatedAt": "2026-07-22T08:46:12Z",
-      "detail": "Opregelen 0.0 MW | afregelen 1488.5 MW | netto afregelen",
+      "updatedAt": "2026-07-22T09:04:24Z",
+      "detail": "Opregelen 0.0 MW | afregelen 613.0 MW | netto afregelen",
       "dataStatus": "verified",
       "statusMessage": "Positief = netto opregelen; negatief = netto afregelen"
-    },
-    {
-      "id": "tennetSettlement",
-      "label": "Onbalansprijs tekort (laatste PTU)",
-      "value": 104.2,
-      "unit": "EUR/MWh",
-      "source": "TenneT API (Settlement Prices)",
-      "sourceUrl": "https://api.tennet.eu/publications/v1/settlement-prices",
-      "updatedAt": "2026-07-22T00:00",
-      "detail": "Tekort 104.2 | overschot 104.2 | conditie DOWN",
-      "dataStatus": "verified",
-      "statusMessage": "Definitieve TenneT-settlement; de kaart toont tekort en overschot afzonderlijk in de toelichting"
     },
     {
       "id": "gaslichtElectricity",
